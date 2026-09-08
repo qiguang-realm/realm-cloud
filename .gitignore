@@ -1,0 +1,159 @@
+# =================================================================
+# 1. 操作系统通用文件 (Operating System Generated Files)
+#    这些是不同操作系统自动生成的元数据文件，不应纳入版本控制[reference:8]。
+# =================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# =================================================================
+# 2. 集成开发环境 (IDE) 与 编辑器 (Editor)
+#    IDE和编辑器的配置文件属于个人偏好，不应强制统一[reference:9]。
+# =================================================================
+
+# IntelliJ IDEA (以及 Android Studio 等基于IDEA的IDE)[reference:10][reference:11]
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Eclipse
+.settings/
+.project
+.classpath
+.metadata
+
+# VS Code[reference:12][reference:13]
+.vscode/
+*.code-workspace
+.history/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# =================================================================
+# 3. Java 与 Spring Boot
+#    忽略编译产物、构建工具临时文件及敏感配置[reference:14]。
+# =================================================================
+
+# 编译后的字节码文件
+*.class
+
+# 构建输出目录 (Maven, Gradle)[reference:15][reference:16]
+target/
+build/
+
+# 打包后的文件
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+
+# Maven Wrapper (保留核心 wrapper.jar 文件，忽略脚本)
+.mvn/
+mvnw
+mvnw.cmd
+!.mvn/wrapper/maven-wrapper.jar
+
+# Gradle Wrapper (保留核心 wrapper.jar 文件)
+gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.jar
+gradlew
+gradlew.bat
+.gradle/
+
+# Spring Boot 配置文件 (忽略含敏感信息的本地配置，保留基础配置模板)[reference:17]
+application-*.yml
+application-*.yaml
+application-*.properties
+!application-example.yml
+!application-example.properties
+# 注意: 基础的 application.yml 或 application.properties 应被提交，
+#       其中只包含非敏感的默认配置。
+
+# =================================================================
+# 4. Node.js 与 前端 (React, Vue, Angular, UMI 等)[reference:18][reference:19]
+#    忽略体积巨大的依赖、构建产物和环境变量文件。
+# =================================================================
+
+# 依赖目录
+node_modules/
+
+# 包管理器日志
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 构建输出目录
+dist/
+dist-ssr/
+.umi/
+.umi-production/
+.umi-test/
+.out/
+.vite/
+.nuxt/
+.next/
+
+# 缓存目录
+.cache/
+.parcel-cache/
+.coverage
+.nyc_output/
+
+# =================================================================
+# 5. 环境变量与敏感信息 (Environment Variables & Secrets)
+#    包含密钥、密码等敏感信息的文件绝对不应提交[reference:20]。
+# =================================================================
+
+.env
+.env.local
+.env.*.local
+
+# =================================================================
+# 6. 日志与临时文件 (Logs & Temporary Files)
+# =================================================================
+
+logs/
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+
+# =================================================================
+# 7. 其他通用文件 (Other Common Files)
+# =================================================================
+
+# 依赖锁文件 (推荐提交，以确保环境一致性)[reference:21]
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Docker
+docker-compose.override.yml
+*.pid
+*.seed
+*.pid.lock
