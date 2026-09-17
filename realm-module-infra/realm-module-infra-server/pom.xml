@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-module-infra</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-module-infra-server</artifactId>
+    <packaging>jar</packaging>
+
+    <!-- 项目信息 / Project information -->
+    <name>${project.artifactId}</name>
+    <description>
+        Infra 服务端实现，提供基础设施运维（定时任务、服务器信息）和研发工具（代码生成器、接口文档）。
+        Infra server implementation providing infrastructure operations and development tools.
+    </description>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!-- Realm 基础 Starter：环境拓展（特性环境能力） / Realm base starter: env extension (feature environment capability) -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-env</artifactId>
+        </dependency>
+
+        <!-- 内部 API 依赖：本模块对外暴露的接口定义 / Internal API dependency: interface definitions exposed by this module -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-module-infra-api</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
+        <!-- 业务组件：多租户支持 / Business component: multi-tenancy support -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-biz-tenant</artifactId>
+        </dependency>
+
+        <!-- Web 与安全：安全框架与 WebSocket 支持 / Web & security: security framework and WebSocket support -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-websocket</artifactId>
+        </dependency>
+
+        <!-- 数据库与持久化：MyBatis 与 Redis / Database & persistence: MyBatis and Redis -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-mybatis</artifactId>
+        </dependency>
+        <!-- 代码生成器（用于解析表结构） / Code generator (table schema parser) -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-generator</artifactId>
+        </dependency>
+        <!-- Velocity 模板引擎（用于代码生成） / Velocity template engine (for code generation) -->
+        <dependency>
+            <groupId>org.apache.velocity</groupId>
+            <artifactId>velocity-engine-core</artifactId>
+        </dependency>
+        <!-- FreeMarker 模板引擎（用于代码生成） / FreeMarker template engine (for code generation) -->
+        <dependency>
+            <groupId>org.freemarker</groupId>
+            <artifactId>freemarker</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-redis</artifactId>
+        </dependency>
+
+        <!-- 微服务与 RPC：Feign 客户端与 Nacos 注册/配置中心 / Microservices & RPC: Feign client and Nacos registry/config center -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-rpc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+        </dependency>
+
+        <!-- 定时任务与消息队列 / Job scheduling and message queue -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-job</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-mq</artifactId>
+        </dependency>
+
+        <!-- 测试组件（test 作用域） / Test starter (test scope) -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- 工具类：Excel 拓展 / Utility: Excel extension -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-excel</artifactId>
+        </dependency>
+
+        <!-- 监控组件 / Monitoring starter -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-monitor</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Admin Server（可选，按需启用；如启用请取消注释） / Optional: Spring Boot Admin Server (uncomment to enable) -->
+        <!--
+        <dependency>
+            <groupId>de.codecentric</groupId>
+            <artifactId>spring-boot-admin-starter-server</artifactId>
+        </dependency>
+        -->
+
+        <!-- 云服务与文件客户端 / Cloud services & file clients -->
+        <!-- FTP 客户端 / FTP client -->
+        <dependency>
+            <groupId>commons-net</groupId>
+            <artifactId>commons-net</artifactId>
+        </dependency>
+        <!-- SFTP 客户端 / SFTP client -->
+        <dependency>
+            <groupId>com.github.mwiede</groupId>
+            <artifactId>jsch</artifactId>
+        </dependency>
+        <!-- S3 客户端（兼容 AWS S3、阿里云 OSS、腾讯云 COS、MinIO 等） / S3 client (compatible with AWS S3, Alibaba OSS, Tencent COS, MinIO, etc.) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+        </dependency>
+        <!-- 文件类型识别 / File type detection -->
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+        </dependency>
+
+    </dependencies>
+
+    <!-- 构建配置 / Build configuration -->
+    <build>
+        <!-- 设置构建的 JAR 包名 / Set the final JAR name -->
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <!-- Spring Boot 打包插件（将应用打包为包含全部依赖的可执行 JAR） / Spring Boot Maven Plugin (repackage as executable JAR) -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring-boot.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <!-- 将依赖一同打入最终包 / Repackage with all dependencies -->
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

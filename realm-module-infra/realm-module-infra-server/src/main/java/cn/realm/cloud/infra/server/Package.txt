@@ -1,0 +1,296 @@
+
+
+想了解国际标准中包名命名的顺序规范。指的是Java或类似语言中包名的命名约定。
+
+国际标准（主要是Java官方及业界广泛遵循的规范）对包名命名的顺序有明确约定：采用“反向域名”作为唯一前缀，以确保全球唯一性。
+
+📜 标准顺序：“反向域名” + 项目/模块名
+
+标准顺序就是：[顶级域名].[组织域名].[项目/模块名]。
+
+
+cn.realm.cloud.infra.api
+├── controller/          # (1) 请求控制器层 (API 入口)
+│   ├── admin/           # 管理后台接口
+│   └── app/             # App/小程序接口
+├── service/             # (2) 业务逻辑层
+│   ├── JobService.java
+│   └── impl/            # 服务实现类 (可选)
+│       └── JobServiceImpl.java
+├── repository/          # (3) 数据访问层 (DAO)
+│   └── JobRepository.java
+├── model/               # (4) 数据模型层 (Domain Objects)
+│   ├── entity/          # 数据库实体 (与表一一对应)[reference:3]
+│   ├── dto/             # 数据传输对象 (Service/Controller 间传递)[reference:4]
+│   │   ├── request/     # 请求 DTO (API 入参)[reference:5]
+│   │   └── response/    # 响应 DTO (API 出参)[reference:6]
+│   └── vo/              # 视图对象 (供前端展示)[reference:7]
+├── mapper/              # (5) 对象映射层 (可选)
+│   └── JobMapper.java   # Entity <-> DTO 转换
+├── config/              # (6) 配置类
+├── exception/           # (7) 异常处理
+│   ├── BusinessException.java
+│   └── GlobalExceptionHandler.java
+├── enums/               # (8) 枚举类[reference:10]
+│   └── JobStatusEnum.java
+└── util/                # (9) 工具类[reference:11]
+    └── JobUtil.java
+
+
+
+🎯 标准 Maven 资源目录结构
+
+src/main/resources/
+├── application.yml                    ★ Spring Boot 主配置文件（根目录）
+├── application-dev.yml                ★ 环境配置（dev/test/prod，根目录）
+├── application-test.yml
+├── application-prod.yml
+├── bootstrap.yml                      ★ Spring Cloud 配置中心（Nacos 等）引导配置
+├── logback-spring.xml                 ★ 日志配置（根目录）
+│
+├── mapper/                            ★ MyBatis XML 映射文件（根目录下）
+│   ├── JobMapper.xml
+│   ├── ServerMonitorMapper.xml
+│   └── CodeGeneratorMapper.xml
+│
+├── i18n/                              ★ 国际化资源文件（根目录下）
+│   ├── messages_zh_CN.properties
+│   └── messages_en_US.properties
+│
+├── templates/                         ★ 模板文件（代码生成器/邮件/通知等）
+│   ├── generator/
+│   │   ├── entity.java.vm
+│   │   ├── mapper.java.vm
+│   │   └── service.java.vm
+│   └── mail/
+│       └── notification.html
+│
+├── META-INF/                          ★ 服务提供者配置、Spring 自动配置等
+│   └── spring.factories
+│
+└── static/                            ★ 静态资源（若有 Web 界面，极少用）
+    └── index.html
+
+
+cn.realm.cloud.infra.server
+├── config              # 配置类（如 @Configuration）
+├── controller          # HTTP 接口层（RestController）
+├── service             # 业务逻辑层
+│   ├── job             # 定时任务逻辑
+│   ├── monitor         # 服务器监控逻辑
+│   └── generator       # 代码生成器逻辑
+├── mapper              # MyBatis Mapper 接口
+├── model               # DTO / VO / 实体类
+│   ├── dto
+│   ├── vo
+│   └── entity
+├── handler             # 处理器（如 WebSocket、异常）
+├── util                # 工具类
+└── runner              # 启动后的 Runner
+
+🆚 两种主流分包方式对比
+
+· 按技术层分包 (Package by Layer)
+
+· 按业务模块分包 (Package by Feature)
+
+
+结构 A：直接按业务分包（更推荐）
+
+cn.realm.cloud.infra.server
+├── user/
+│   ├── controller/
+│   │   └── UserController.java
+│   ├── service/
+│   │   ├── UserService.java
+│   │   └── impl/
+│   │       └── UserServiceImpl.java
+│   ├── mapper/
+│   │   └── UserMapper.java
+│   └── model/
+│       ├── entity/
+│       ├── dto/
+│       └── vo/
+├── order/                    # 兄弟模块
+│   └── ... (同上)
+├── payment/                  # 兄弟模块
+│   └── ... (同上)
+└── common/                   # 共享
+    └── ...
+
+
+cn.realm.cloud.infra.server
+├── module/                     ← 聚合层（所有业务/功能模块）
+│   ├── user/                   ← 用户模块
+│   │   ├── controller/
+│   │   │   └── UserController.java
+│   │   ├── service/
+│   │   │   ├── UserService.java
+│   │   │   └── impl/
+│   │   │       └── UserServiceImpl.java
+│   │   ├── mapper/
+│   │   │   └── UserMapper.java
+│   │   └── model/              （或 domain/）
+│   │       ├── entity/
+│   │       │   └── UserEntity.java
+│   │       ├── dto/
+│   │       │   ├── request/
+│   │       │   │   └── UserLoginRequest.java
+│   │       │   └── response/
+│   │       │       └── UserInfoResponse.java
+│   │       └── vo/
+│   │           └── UserProfileVO.java
+│   │
+│   ├── order/                  ← 订单模块
+│   │   ├── controller/
+│   │   ├── service/
+│   │   ├── mapper/
+│   │   └── model/
+│   │
+│   ├── payment/                ← 支付模块
+│   │   └── ... (同上)
+│   │
+│   └── product/                ← 商品模块
+│       └── ... (同上)
+│
+├── common/                     ← 全局共享代码
+│   ├── config/                 （全局配置，如 Jackson、MyBatis-Plus 配置）
+│   ├── exception/              （全局异常、统一异常处理器）
+│   ├── util/                   （通用工具类）
+│   ├── enums/                  （全局枚举）
+│   └── interceptor/            （全局拦截器）
+│
+├── infra/                      （可选：基础设施专用代码，与技术组件相关）
+│   ├── job/                    （定时任务框架封装）
+│   ├── monitor/                （监控指标采集）
+│   └── generator/              （代码生成器核心）
+│
+└── InfraServerApplication.java  ← Spring Boot 启动类（放在根包下）
+
+
+cn.realm.cloud.system.server
+├── module/                     ← 业务模块（如 user、order）
+│   ├── user/
+│   │   ├── controller/
+│   │   ├── service/
+│   │   └── model/
+│   └── role/
+│       └── ...
+├── infra/                      ← 技术基础设施层
+│   ├── captcha/                ← 验证码组件
+│   │   ├── RedisCaptchaServiceImpl.java   ← 核心实现
+│   │   └── CaptchaProperties.java         （配置属性，如过期时间）
+│   ├── job/                    （定时任务框架封装）
+│   ├── monitor/                （监控指标采集）
+│   └── generator/              （代码生成器核心）
+├── common/                     ← 全局共享层
+│   ├── util/
+│   ├── constant/
+│   └── exception/
+└── config/                     ← Spring 全局配置（如 WebMvc、Security）
+
+📌 如何选择？决策树
+
+
+你的业务模块数量（user、order、payment、product...）?
+│
+├── < 5 个  → 结构 A（直接按业务分包），如：user/, order/
+│
+├── 5-10 个 → 结构 A（推荐），或结构 B 均可，看团队偏好
+│
+└── > 10 个 → 结构 B（`module` 聚合），便于管理和拆分
+
+
+
+cn.realm.cloud.infra.server.controller
+├── admin/          ← 后台管理接口（供运营、管理员使用）
+├── app/            ← 移动端接口（供 App/小程序使用）
+└── internal/       ← 内部服务接口（可选，供其他微服务 RPC 调用）
+
+
+common 包结构示例
+
+纯粹的、与业务无关的工具类（Utils），应当放在 common 包下，而不是 core 包下。
+
+
+区分 util 与 helper：
+
+util：存放纯技术性、与业务无关的工具类，例如 DateUtil、HttpClientUtil。
+
+helper：存放与特定业务场景相关的辅助类，例如 OrderHelper。
+
+
+cn.realm.cloud.system.server.common
+├── annotation/                 # 自定义注解
+│   └── RequirePermission.java
+├── aspect/                     # AOP 切面
+│   └── LogAspect.java
+├── config/                     # 全局配置
+│   ├── WebMvcConfig.java
+│   └── MyBatisPlusConfig.java
+├── constant/                   # 常量
+│   └── SystemConstants.java
+├── enums/                      # 全局枚举
+│   └── ResultCode.java
+├── exception/                  # 异常处理
+│   ├── BusinessException.java
+│   └── GlobalExceptionHandler.java
+├── filter/                     # 全局过滤器
+│   └── RequestLogFilter.java
+├── holder/                     # 上下文持有者
+│   └── UserContextHolder.java
+├── interceptor/                # 拦截器
+│   └── LoginInterceptor.java
+├── properties/                 # 配置属性类
+│   └── JwtProperties.java
+├── serializer/                 # 自定义序列化器
+│   └── DateJsonSerializer.java
+├── support/                    # 通用支持组件
+│   └── CacheSupport.java
+├── util/                       # 工具类（纯静态方法）
+│   ├── DateUtil.java
+│   ├── FileUtil.java
+│   └── TemplateDownloadUtil.java
+└── validator/                  # 自定义校验器
+    └── PhoneValidator.java
+
+
+
+对外提供接口的唯一合法方式是通过 API 层（Controller 或 RPC Facade）
+
+cn.realm.cloud.system.server
+├── module/
+│   └── system/
+│       ├── controller/admin/template/
+│       │   └── TemplateDownloadController.java    ← 对外HTTP接口（唯一入口）
+│       └── service/
+│           ├── TemplateDownloadService.java       ← 保留，处理业务逻辑
+│           └── impl/
+│               └── TemplateDownloadServiceImpl.java
+└── common/
+    └── util/
+        └── FileStreamUtil.java                    ← 仅保留纯静态工具（如流复制）
+
+
+
+
+📁 测试目录结构示例
+
+
+realm-module-infra-server/
+├── src/
+│   ├── main/
+│   │   └── java/
+│   │       └── cn/realm/cloud/infra/server/      ← 主代码
+│   │           ├── config/
+│   │           ├── controller/
+│   │           ├── service/
+│   │           └── util/
+│   └── test/
+│       └── java/
+│           └── cn/realm/cloud/infra/server/      ← 测试代码（完全镜像）
+│               ├── config/                        ← 对应测试
+│               ├── controller/                    ← 对应测试
+│               ├── service/                       ← 对应测试
+│               └── util/                          ← 对应测试
+└── pom.xml

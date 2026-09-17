@@ -1,0 +1,877 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 基础信息 / Basic information -->
+    <groupId>cn.realm.cloud</groupId>
+    <artifactId>realm-dependencies</artifactId>
+    <version>${revision}</version>
+    <packaging>pom</packaging>
+    <name>${project.artifactId}</name>
+    <description>
+        统一依赖管理 BOM（Bill of Materials），集中管理项目所有第三方依赖版本。
+        Central BOM for managing all third-party dependency versions in the project.
+    </description>
+    <!-- 请替换为实际仓库地址 / Replace with actual repo URL -->
+    <url>https://github.com/</url>
+
+    <!-- 全局属性配置（所有版本号集中定义，遵循“单一真相源”原则） / Global properties (single source of truth for versions) -->
+    <properties>
+        <!-- 核心版本 / Core versions -->
+        <revision>2026.08-SNAPSHOT</revision>
+        <flatten-maven-plugin.version>1.7.2</flatten-maven-plugin.version>
+
+        <!-- Spring 生态（属性名遵循 Spring 官方约定：spring-boot.version、spring-cloud.version） / Spring ecosystem (property names follow Spring official convention) -->
+        <spring-boot.version>3.5.15</spring-boot.version>
+        <spring-cloud.version>2025.0.0</spring-cloud.version>
+        <spring-cloud-alibaba.version>2023.0.3.3</spring-cloud-alibaba.version>
+
+        <!-- Web 开发 / Web development -->
+        <!-- SpringDoc OpenAPI -->
+        <springdoc.version>2.8.11</springdoc.version>
+        <!-- Knife4j API UI -->
+        <knife4j.version>4.5.0</knife4j.version>
+
+        <!-- 数据库相关 / Database -->
+        <!-- Druid 连接池 / Connection pool -->
+        <druid.version>1.2.27</druid.version>
+        <!-- MyBatis 核心 / MyBatis core -->
+        <mybatis.version>3.5.19</mybatis.version>
+        <!-- MyBatis-Plus -->
+        <mybatis-plus.version>3.5.14</mybatis-plus.version>
+        <!-- 联表查询扩展 / Join extension -->
+        <mybatis-plus-join.version>1.5.4</mybatis-plus-join.version>
+        <!-- 动态数据源 / Dynamic datasource -->
+        <dynamic-datasource.version>4.3.1</dynamic-datasource.version>
+        <!-- 数据翻译 / Data translation (Easy-Trans) -->
+        <easy-trans.version>3.0.6</easy-trans.version>
+        <!-- Redisson 分布式锁/缓存 / Distributed lock & cache -->
+        <redisson.version>3.51.0</redisson.version>
+        <!-- 达梦数据库驱动 / Dameng DB driver -->
+        <dm8.jdbc.version>8.1.3.140</dm8.jdbc.version>
+        <!-- 人大金仓驱动 / Kingbase driver -->
+        <kingbase.jdbc.version>8.6.0</kingbase.jdbc.version>
+        <!-- openGauss 驱动 / openGauss driver -->
+        <opengauss.jdbc.version>5.1.0</opengauss.jdbc.version>
+        <!-- TDengine 时序数据库驱动 / Time-series DB driver -->
+        <taos.version>3.7.3</taos.version>
+
+        <!-- 消息队列 / Message queue -->
+        <!-- RocketMQ Spring Boot Starter -->
+        <rocketmq-spring.version>2.3.4</rocketmq-spring.version>
+
+        <!-- 定时任务 & 服务保障 / Scheduling & service protection -->
+        <!-- XXL-JOB 分布式任务调度 / Distributed job scheduler -->
+        <xxl-job.version>2.4.0</xxl-job.version>
+        <!-- Lock4j 分布式锁 / Distributed lock -->
+        <lock4j.version>2.2.7</lock4j.version>
+
+        <!-- 监控 / Monitoring -->
+        <!-- SkyWalking 链路追踪 / Tracing -->
+        <skywalking.version>9.5.0</skywalking.version>
+        <!-- Spring Boot Admin -->
+        <spring-boot-admin.version>3.5.2</spring-boot-admin.version>
+        <!-- OpenTracing API -->
+        <opentracing.version>0.33.0</opentracing.version>
+
+        <!-- 测试 / Testing -->
+        <!-- 随机 POJO 生成 / Random POJO generator -->
+        <podam.version>8.0.2.RELEASE</podam.version>
+        <!-- Jedis Mock（Redis 模拟） / Redis mock -->
+        <jedis-mock.version>1.1.11</jedis-mock.version>
+        <!-- Mockito 内联支持（final/static） / Inline support -->
+        <mockito-inline.version>5.2.0</mockito-inline.version>
+
+        <!-- 工作流 / Workflow -->
+        <!-- Flowable 工作流引擎 / Workflow engine -->
+        <flowable.version>7.0.1</flowable.version>
+
+        <!-- 工具类 / Utilities -->
+        <!-- 验证码生成 / Captcha generator -->
+        <anji-plus-captcha.version>1.4.0</anji-plus-captcha.version>
+        <!-- HTML 解析 / HTML parser -->
+        <jsoup.version>1.21.2</jsoup.version>
+        <!-- Lombok -->
+        <lombok.version>1.18.38</lombok.version>
+        <!-- MapStruct 对象映射 / Object mapping -->
+        <mapstruct.version>1.6.3</mapstruct.version>
+        <!-- Lombok-MapStruct 绑定 / Lombok-MapStruct binding -->
+        <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
+        <!-- Hutool 5.x -->
+        <hutool-5.version>5.8.40</hutool-5.version>
+        <!-- Hutool 6.x（扩展） / Hutool 6.x (extra) -->
+        <hutool-6.version>6.0.0-M22</hutool-6.version>
+        <!-- FastExcel（EasyExcel 替代） / FastExcel (EasyExcel alternative) -->
+        <fastexcel.version>1.3.0</fastexcel.version>
+        <!-- Velocity 模板引擎 / Template engine -->
+        <velocity.version>2.4.1</velocity.version>
+        <!-- Fastjson 1.x（兼容） / Fastjson 1.x (compatibility) -->
+        <fastjson.version>1.2.83</fastjson.version>
+        <!-- Google Guava -->
+        <guava.version>33.4.8-jre</guava.version>
+        <!-- 线程上下文传递 / Thread context propagation -->
+        <transmittable-thread-local.version>2.14.5</transmittable-thread-local.version>
+        <!-- Apache Commons Net（FTP 等） / FTP etc. -->
+        <commons-net.version>3.11.1</commons-net.version>
+        <!-- Apache Commons Lang3 -->
+        <commons-lang3.version>3.18.0</commons-lang3.version>
+        <!-- JSch SFTP 客户端 / SFTP client -->
+        <jsch.version>2.27.3</jsch.version>
+        <!-- Apache Tika（文件类型识别） / File type detection -->
+        <tika-core.version>3.2.2</tika-core.version>
+        <!-- IP2Region（离线 IP 定位） / Offline IP location -->
+        <ip2region.version>2.7.0</ip2region.version>
+        <!-- 业务日志 SDK / Business log SDK -->
+        <bizlog-sdk.version>3.0.6</bizlog-sdk.version>
+        <!-- Reflections（反射扫描） / Reflection scanning -->
+        <reflections.version>0.10.2</reflections.version>
+        <!-- Netty -->
+        <netty.version>4.2.4.Final</netty.version>
+        <!-- Eclipse Paho MQTT 客户端 / MQTT client -->
+        <mqtt.version>1.2.5</mqtt.version>
+        <!-- Vert.x（异步框架） / Async framework -->
+        <vertx.version>4.5.13</vertx.version>
+        <!-- PF4J Spring 集成 / PF4J Spring integration -->
+        <pf4j-spring.version>0.9.0</pf4j-spring.version>
+
+        <!-- OkHttp HTTP 客户端 / HTTP client -->
+        <okhttp.version>4.12.0</okhttp.version>
+        <!-- Eclipse Californium（CoAP 协议） / CoAP -->
+        <californium.version>3.14.0</californium.version>
+        <!-- j2mod（Modbus 协议） / Modbus -->
+        <j2mod.version>3.3.0</j2mod.version>
+        <!-- 支付宝 SDK / Alipay SDK -->
+        <alipay-sdk-java.version>4.40.865.ALL</alipay-sdk-java.version>
+        <!-- Bouncy Castle（加密库） / Crypto library -->
+        <bouncycastle.version>1.80</bouncycastle.version>
+        <!-- 敏感词检测（Trie） / Sensitive word detection -->
+        <sensitive-word.version>0.29.5</sensitive-word.version>
+        <!-- 汉字转拼音（Hutool 使用） / Pinyin conversion (used by Hutool) -->
+        <pinyin4j.version>2.5.1</pinyin4j.version>
+
+        <!-- 三方云服务 / Third-party cloud services -->
+        <!-- AWS SDK（S3 等） / AWS SDK (S3 etc.) -->
+        <awssdk.version>2.30.14</awssdk.version>
+        <!-- JustAuth（第三方登录） / OAuth login -->
+        <justauth.version>1.16.7</justauth.version>
+        <!-- JustAuth Spring Boot Starter -->
+        <justauth-starter.version>1.4.0</justauth-starter.version>
+        <!-- 积木报表 / JimuReport -->
+        <jimureport.version>2.1.1</jimureport.version>
+        <!-- 积木 BI / JimuBI -->
+        <jimubi.version>2.1.0</jimubi.version>
+        <!-- 微信 Java SDK / WeChat Java SDK -->
+        <weixin-java.version>4.7.7-20250808.182223</weixin-java.version>
+
+        <!-- 自定义版本 / Custom versions -->
+        <!-- Apache PDFBox（PDF 处理） / PDF processing -->
+        <pdfbox.version>3.0.8</pdfbox.version>
+        <!-- Univocity（CSV/TSV 解析） / CSV/TSV parsers -->
+        <univocity-parsers.version>2.9.1</univocity-parsers.version>
+    </properties>
+
+    <!-- 依赖管理（此处仅声明版本，不会实际引入依赖；子模块引用时无需指定版本） / Dependency management (versions only; no actual imports) -->
+    <dependencyManagement>
+        <dependencies>
+
+            <!-- 统一依赖管理 BOM（导入 Spring 生态） / Imported BOMs for Spring ecosystem -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>${netty.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                <version>${spring-cloud-alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- 业务功能组件（Realm 框架自定义） / Business components (Realm custom) -->
+            <dependency>
+                <groupId>io.github.mouzt</groupId>
+                <artifactId>bizlog-sdk</artifactId>
+                <version>${bizlog-sdk.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-biz-tenant</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-biz-data-permission</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-biz-ip</artifactId>
+                <version>${revision}</version>
+            </dependency>
+
+            <!-- Spring 核心增强 / Spring core enhancements -->
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-env</artifactId>
+                <version>${revision}</version>
+            </dependency>
+
+            <!-- Web 开发相关 / Web development -->
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-web</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-security</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-websocket</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <!-- API 文档 / API documentation -->
+            <dependency>
+                <groupId>com.github.xiaoymin</groupId>
+                <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+                <version>${knife4j.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.springdoc</groupId>
+                        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.xiaoymin</groupId>
+                <artifactId>knife4j-gateway-spring-boot-starter</artifactId>
+                <version>${knife4j.version}</version>
+            </dependency>
+
+            <!-- 数据库与 ORM / Database & ORM -->
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-mybatis</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>druid-spring-boot-3-starter</artifactId>
+                <version>${druid.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mybatis</groupId>
+                <artifactId>mybatis</artifactId>
+                <version>${mybatis.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-jsqlparser</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-generator</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>dynamic-datasource-spring-boot3-starter</artifactId>
+                <version>${dynamic-datasource.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.yulichang</groupId>
+                <artifactId>mybatis-plus-join-boot-starter</artifactId>
+                <version>${mybatis-plus-join.version}</version>
+            </dependency>
+            <!-- Easy-Trans 数据翻译 / Data translation -->
+            <dependency>
+                <groupId>com.fhs-opensource</groupId>
+                <artifactId>easy-trans-spring-boot-starter</artifactId>
+                <version>${easy-trans.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-context</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.springframework.cloud</groupId>
+                        <artifactId>spring-cloud-commons</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>com.fhs-opensource</groupId>
+                <artifactId>easy-trans-mybatis-plus-extend</artifactId>
+                <version>${easy-trans.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fhs-opensource</groupId>
+                <artifactId>easy-trans-anno</artifactId>
+                <version>${easy-trans.version}</version>
+            </dependency>
+
+            <!-- 缓存与分布式锁 / Cache & distributed lock -->
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-redis</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <!-- Redisson（排除不兼容的 spring-data-41，改用 spring-data-35） / Redisson (exclude spring-data-41, use spring-data-35) -->
+            <dependency>
+                <groupId>org.redisson</groupId>
+                <artifactId>redisson-spring-boot-starter</artifactId>
+                <version>${redisson.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.redisson</groupId>
+                        <artifactId>redisson-spring-data-41</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>org.redisson</groupId>
+                <artifactId>redisson-spring-data-35</artifactId>
+                <version>${redisson.version}</version>
+            </dependency>
+
+            <!-- 国产数据库驱动 / Domestic database drivers -->
+            <dependency>
+                <groupId>com.dameng</groupId>
+                <artifactId>DmJdbcDriver18</artifactId>
+                <version>${dm8.jdbc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.opengauss</groupId>
+                <artifactId>opengauss-jdbc</artifactId>
+                <version>${opengauss.jdbc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.com.kingbase</groupId>
+                <artifactId>kingbase8</artifactId>
+                <version>${kingbase.jdbc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.taosdata.jdbc</groupId>
+                <artifactId>taos-jdbcdriver</artifactId>
+                <version>${taos.version}</version>
+            </dependency>
+
+            <!-- 微服务与 RPC / Microservices & RPC -->
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-rpc</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-mq</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.rocketmq</groupId>
+                <artifactId>rocketmq-spring-boot-starter</artifactId>
+                <version>${rocketmq-spring.version}</version>
+            </dependency>
+
+            <!-- 分布式任务调度 / Distributed job scheduling -->
+            <dependency>
+                <groupId>com.xuxueli</groupId>
+                <artifactId>xxl-job-core</artifactId>
+                <version>${xxl-job.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-job</artifactId>
+                <version>${revision}</version>
+            </dependency>
+
+            <!-- 服务保障（限流、降级、熔断） / Service protection -->
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-protection</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>lock4j-redisson-spring-boot-starter</artifactId>
+                <version>${lock4j.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <artifactId>redisson-spring-boot-starter</artifactId>
+                        <groupId>org.redisson</groupId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <!-- 系统监控 / System monitoring -->
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-monitor</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <!-- SkyWalking -->
+            <dependency>
+                <groupId>org.apache.skywalking</groupId>
+                <artifactId>apm-toolkit-trace</artifactId>
+                <version>${skywalking.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.skywalking</groupId>
+                <artifactId>apm-toolkit-logback-1.x</artifactId>
+                <version>${skywalking.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.skywalking</groupId>
+                <artifactId>apm-toolkit-opentracing</artifactId>
+                <version>${skywalking.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.skywalking</groupId>
+                <artifactId>apm-toolkit-webflux</artifactId>
+                <version>${skywalking.version}</version>
+            </dependency>
+            <!-- OpenTracing -->
+            <dependency>
+                <groupId>io.opentracing</groupId>
+                <artifactId>opentracing-api</artifactId>
+                <version>${opentracing.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.opentracing</groupId>
+                <artifactId>opentracing-util</artifactId>
+                <version>${opentracing.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.opentracing</groupId>
+                <artifactId>opentracing-noop</artifactId>
+                <version>${opentracing.version}</version>
+            </dependency>
+            <!-- Spring Boot Admin -->
+            <dependency>
+                <groupId>de.codecentric</groupId>
+                <artifactId>spring-boot-admin-starter-server</artifactId>
+                <version>${spring-boot-admin.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>de.codecentric</groupId>
+                <artifactId>spring-boot-admin-starter-client</artifactId>
+                <version>${spring-boot-admin.version}</version>
+            </dependency>
+
+            <!-- 测试相关 / Testing -->
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-test</artifactId>
+                <version>${revision}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-inline</artifactId>
+                <version>${mockito-inline.version}</version>
+            </dependency>
+            <!-- 显式声明版本，避免因 BOM 导入失败导致版本无法解析（排除 asm 与 mockito-core，统一由父 POM 管理） / Explicit version to avoid resolution failure if BOM import fails (exclude asm & mockito-core, managed by parent) -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-test</artifactId>
+                <version>${spring-boot.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <artifactId>asm</artifactId>
+                        <groupId>org.ow2.asm</groupId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.mockito</groupId>
+                        <artifactId>mockito-core</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>com.github.fppt</groupId>
+                <artifactId>jedis-mock</artifactId>
+                <version>${jedis-mock.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>uk.co.jemos.podam</groupId>
+                <artifactId>podam</artifactId>
+                <version>${podam.version}</version>
+            </dependency>
+
+            <!-- 工作流引擎 / Workflow engine -->
+            <dependency>
+                <groupId>org.flowable</groupId>
+                <artifactId>flowable-spring-boot-starter-process</artifactId>
+                <version>${flowable.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.flowable</groupId>
+                <artifactId>flowable-spring-boot-starter-actuator</artifactId>
+                <version>${flowable.version}</version>
+            </dependency>
+
+            <!-- 工具类库（Realm 通用 + 第三方） / Utility libraries -->
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-common</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-excel</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <!-- Lombok -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+            </dependency>
+            <!-- MapStruct -->
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct-processor</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+            <!-- Lombok-MapStruct 绑定 / Lombok-MapStruct binding -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok-mapstruct-binding</artifactId>
+                <version>${lombok-mapstruct-binding.version}</version>
+            </dependency>
+            <!-- Hutool 5.x -->
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>${hutool-5.version}</version>
+            </dependency>
+            <!-- Hutool 6.x（扩展） / Hutool 6.x (extra) -->
+            <dependency>
+                <groupId>org.dromara.hutool</groupId>
+                <artifactId>hutool-extra</artifactId>
+                <version>${hutool-6.version}</version>
+            </dependency>
+            <!-- FastExcel -->
+            <dependency>
+                <groupId>cn.idev.excel</groupId>
+                <artifactId>fastexcel</artifactId>
+                <version>${fastexcel.version}</version>
+            </dependency>
+            <!-- Apache PDFBox -->
+            <dependency>
+                <groupId>org.apache.pdfbox</groupId>
+                <artifactId>pdfbox</artifactId>
+                <version>${pdfbox.version}</version>
+            </dependency>
+            <!-- Univocity -->
+            <dependency>
+                <groupId>com.univocity</groupId>
+                <artifactId>univocity-parsers</artifactId>
+                <version>${univocity-parsers.version}</version>
+            </dependency>
+            <!-- Apache Tika -->
+            <dependency>
+                <groupId>org.apache.tika</groupId>
+                <artifactId>tika-core</artifactId>
+                <version>${tika-core.version}</version>
+            </dependency>
+            <!-- Velocity -->
+            <dependency>
+                <groupId>org.apache.velocity</groupId>
+                <artifactId>velocity-engine-core</artifactId>
+                <version>${velocity.version}</version>
+            </dependency>
+            <!-- Fastjson -->
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>fastjson</artifactId>
+                <version>${fastjson.version}</version>
+            </dependency>
+            <!-- Guava -->
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>${guava.version}</version>
+            </dependency>
+            <!-- TransmittableThreadLocal -->
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>transmittable-thread-local</artifactId>
+                <version>${transmittable-thread-local.version}</version>
+            </dependency>
+            <!-- Commons Net -->
+            <dependency>
+                <groupId>commons-net</groupId>
+                <artifactId>commons-net</artifactId>
+                <version>${commons-net.version}</version>
+            </dependency>
+            <!-- JSch -->
+            <dependency>
+                <groupId>com.github.mwiede</groupId>
+                <artifactId>jsch</artifactId>
+                <version>${jsch.version}</version>
+            </dependency>
+            <!-- Captcha -->
+            <dependency>
+                <groupId>com.anji-plus</groupId>
+                <artifactId>captcha-spring-boot-starter</artifactId>
+                <version>${anji-plus-captcha.version}</version>
+            </dependency>
+            <!-- IP2Region -->
+            <dependency>
+                <groupId>org.lionsoul</groupId>
+                <artifactId>ip2region</artifactId>
+                <version>${ip2region.version}</version>
+            </dependency>
+            <!-- Jsoup -->
+            <dependency>
+                <groupId>org.jsoup</groupId>
+                <artifactId>jsoup</artifactId>
+                <version>${jsoup.version}</version>
+            </dependency>
+            <!-- Reflections -->
+            <dependency>
+                <groupId>org.reflections</groupId>
+                <artifactId>reflections</artifactId>
+                <version>${reflections.version}</version>
+            </dependency>
+            <!-- 敏感词 / Sensitive word -->
+            <dependency>
+                <groupId>com.github.houbb</groupId>
+                <artifactId>sensitive-word</artifactId>
+                <version>${sensitive-word.version}</version>
+            </dependency>
+            <!-- 拼音 / Pinyin4j -->
+            <dependency>
+                <groupId>com.belerweb</groupId>
+                <artifactId>pinyin4j</artifactId>
+                <version>${pinyin4j.version}</version>
+            </dependency>
+
+            <!-- 三方云服务与支付 / Cloud services & payment -->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>s3</artifactId>
+                <version>${awssdk.version}</version>
+            </dependency>
+            <!-- 微信支付 / WeChat Pay -->
+            <dependency>
+                <groupId>com.github.binarywang</groupId>
+                <artifactId>weixin-java-pay</artifactId>
+                <version>${weixin-java.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.binarywang</groupId>
+                <artifactId>wx-java-mp-spring-boot-starter</artifactId>
+                <version>${weixin-java.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.binarywang</groupId>
+                <artifactId>wx-java-miniapp-spring-boot-starter</artifactId>
+                <version>${weixin-java.version}</version>
+            </dependency>
+            <!-- Bouncy Castle（统一版本，避免冲突） / Bouncy Castle (fix version conflicts) -->
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcutil-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcpkix-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <!-- 支付宝 SDK / Alipay -->
+            <dependency>
+                <groupId>com.alipay.sdk</groupId>
+                <artifactId>alipay-sdk-java</artifactId>
+                <version>${alipay-sdk-java.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.bouncycastle</groupId>
+                        <artifactId>bcprov-jdk15on</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.alibaba</groupId>
+                        <artifactId>fastjson</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <!-- JustAuth -->
+            <dependency>
+                <groupId>me.zhyd.oauth</groupId>
+                <artifactId>JustAuth</artifactId>
+                <version>${justauth.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.xkcoding.justauth</groupId>
+                <artifactId>justauth-spring-boot-starter</artifactId>
+                <version>${justauth-starter.version}</version>
+            </dependency>
+
+            <!-- 积木报表 / JimuReport -->
+            <dependency>
+                <groupId>org.jeecgframework.jimureport</groupId>
+                <artifactId>jimureport-spring-boot3-starter-fastjson2</artifactId>
+                <version>${jimureport.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jeecgframework.jimureport</groupId>
+                <artifactId>jimubi-spring-boot3-starter</artifactId>
+                <version>${jimubi.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>com.github.jsqlparser</groupId>
+                        <artifactId>jsqlparser</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>cn.hutool</groupId>
+                        <artifactId>hutool-core</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <!-- 插件框架 / Plugin framework (PF4J) -->
+            <dependency>
+                <groupId>org.pf4j</groupId>
+                <artifactId>pf4j-spring</artifactId>
+                <version>${pf4j-spring.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.slf4j</groupId>
+                        <artifactId>slf4j-log4j12</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <!-- Vert.x 异步框架 / Vert.x async framework -->
+            <dependency>
+                <groupId>io.vertx</groupId>
+                <artifactId>vertx-core</artifactId>
+                <version>${vertx.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.vertx</groupId>
+                <artifactId>vertx-web</artifactId>
+                <version>${vertx.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.vertx</groupId>
+                <artifactId>vertx-mqtt</artifactId>
+                <version>${vertx.version}</version>
+            </dependency>
+
+            <!-- MQTT 客户端 / MQTT client -->
+            <dependency>
+                <groupId>org.eclipse.paho</groupId>
+                <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
+                <version>${mqtt.version}</version>
+            </dependency>
+
+            <!-- 其他第三方库 / Other third-party libraries -->
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp</artifactId>
+                <version>${okhttp.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>mockwebserver</artifactId>
+                <version>${okhttp.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.californium</groupId>
+                <artifactId>californium-core</artifactId>
+                <version>${californium.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.ghgande</groupId>
+                <artifactId>j2mod</artifactId>
+                <version>${j2mod.version}</version>
+            </dependency>
+
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- BOM 构建配置（使用 flatten-maven-plugin 生成扁平化 POM，便于作为 BOM 导入） / BOM build configuration -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>${flatten-maven-plugin.version}</version>
+                <configuration>
+                    <flattenMode>bom</flattenMode>
+                    <updatePomFile>true</updatePomFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

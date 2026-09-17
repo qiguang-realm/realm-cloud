@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理；未指定 relativePath，Maven 按默认顺序查找） / Parent POM (version ${revision} managed by parent; relativePath omitted) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-spring-boot-starter-biz-tenant</artifactId>
+    <packaging>jar</packaging>
+
+    <!-- 项目信息 / Project information -->
+    <name>${project.artifactId}</name>
+    <description>多租户自动配置 starter / Multi-tenancy auto-configuration starter</description>
+    <!-- 请替换为实际仓库地址 / Replace with actual repository URL -->
+    <url>https://github.com/your-org/realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控；非必要依赖标记为 optional 供使用方按需选择，依赖按功能分组） / Dependencies (all versions managed by parent; non-essential deps marked optional; grouped by functional area) -->
+    <dependencies>
+
+        <!-- 核心工具：模块内通用的工具函数 / Core utilities: common utility functions used across the module -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-common</artifactId>
+        </dependency>
+
+        <!-- 安全集成：提供当前用户与租户信息，用于租户隔离 / Security integration: current user & tenant info for tenant isolation -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- MyBatis 增强：提供租户插件与数据权限过滤 / MyBatis enhancement: tenant plugin & data permission filtering -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-mybatis</artifactId>
+        </dependency>
+
+        <!-- Redis 集成：用于缓存租户配置及租户范围数据 / Redis integration: cache tenant configs and tenant-scoped data -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-redis</artifactId>
+        </dependency>
+
+        <!-- 可选集成（使用方可按需启用） / Optional integrations (consumers may enable as needed) -->
+
+        <!-- RPC 支持：向下游服务传递租户上下文 / RPC support: propagate tenant context to downstream services -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-rpc</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 任务调度：支持租户感知的批处理 / Job scheduling: tenant-aware batch processing -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-job</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 消息队列抽象层 / Message queue abstraction layer -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-mq</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 具体 MQ 客户端（与 MQ starter 配合使用） / Concrete MQ clients (used together with the MQ starter) -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.amqp</groupId>
+            <artifactId>spring-rabbit</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.rocketmq</groupId>
+            <artifactId>rocketmq-spring-boot-starter</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 测试支持 / Test support -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- 第三方工具：Google Guava（缓存与字符串处理工具） / Third-party utilities: Google Guava (caching & string utilities) -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+        </dependency>
+
+    </dependencies>
+
+</project>

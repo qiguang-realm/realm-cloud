@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理；未指定 relativePath，Maven 按默认顺序查找） / Parent POM (version ${revision} managed by parent; relativePath omitted) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-spring-boot-starter-websocket</artifactId>
+    <packaging>jar</packaging>
+
+    <!-- 项目信息：WebSocket 框架，支持多节点广播 / Project info: WebSocket framework with multi-node broadcast support -->
+    <name>${project.artifactId}</name>
+    <description>
+        WebSocket 框架，支持多节点广播。
+        WebSocket framework with multi-node broadcast support.
+    </description>
+    <!-- 请替换为实际仓库地址 / Replace with actual repository URL -->
+    <url>https://github.com/your-org/realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控，依赖按功能分组） / Dependencies (all versions managed by parent; grouped by functional area) -->
+    <dependencies>
+
+        <!-- 通用工具：各模块共用的核心工具库 / Common utilities: core utility library used across all modules -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-common</artifactId>
+        </dependency>
+
+        <!-- 安全集成（provided：WebSocket 会话与当前登录用户关联，见 WebSocketSessionManagerImpl；采用 provided 避免强制使用方引入安全模块；选择让 websocket 依赖 security 而非反向扩展，以保持 websocket 组件内聚、降低概念负担） / Security integration (provided: WebSocket sessions are bound to the current login user; provided keeps security optional for consumers; websocket depends on security to keep the component cohesive) -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-security</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- WebSocket 核心支持：Spring Boot WebSocket starter / WebSocket core support: Spring Boot WebSocket starter -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
+        <!-- 消息队列抽象：用于跨节点广播 WebSocket 消息；具体 MQ 实现标记为 optional，由使用方按需选择 / MQ abstraction: for broadcasting WebSocket messages across nodes; concrete MQ implementations are optional -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-mq</artifactId>
+        </dependency>
+        <!-- Kafka -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- RabbitMQ -->
+        <dependency>
+            <groupId>org.springframework.amqp</groupId>
+            <artifactId>spring-rabbit</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- RocketMQ -->
+        <dependency>
+            <groupId>org.apache.rocketmq</groupId>
+            <artifactId>rocketmq-spring-boot-starter</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 多租户集成（provided：向指定类型用户广播时需按租户过滤，避免跨租户消息泄露；采用 provided 以便非租户部署时保持可选） / Multi-tenancy integration (provided: tenant filtering when broadcasting to a specific user type; provided keeps it optional for non-tenant deployments) -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-biz-tenant</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

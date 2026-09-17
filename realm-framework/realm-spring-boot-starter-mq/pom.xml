@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父工程统一管理；未指定 relativePath，Maven 按默认顺序查找） / Parent POM (version ${revision} managed by parent; relativePath omitted) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-spring-boot-starter-mq</artifactId>
+    <packaging>jar</packaging>
+
+    <!-- 项目信息：消息队列自动配置 Starter，支持 Redis（Stream）、RocketMQ、RabbitMQ、Kafka 四种消息中间件的统一接入，各实现均以 optional 引入由使用方按需选择 / Project info: MQ auto-configuration starter supporting Redis Stream, RocketMQ, RabbitMQ, and Kafka; each implementation is optional -->
+    <name>${project.artifactId}</name>
+    <description>
+        消息队列自动配置 Starter（Message Queue Auto-Configuration Starter），
+        支持 Redis（Stream）、RocketMQ、RabbitMQ、Kafka 四种消息中间件的统一接入。
+        各实现均以 optional 方式引入，由使用者按需选择。
+    </description>
+    <!-- 请替换为实际仓库地址 / Replace with actual repository URL -->
+    <url>https://github.com/your-org/realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控；非必须依赖使用 optional，由最终使用者按需引入） / Dependencies (all versions managed by parent; non-essential deps marked optional) -->
+    <dependencies>
+
+        <!-- Realm 基础组件：Redis 操作支持（用于基于 Redis Stream 的消息队列实现，版本继承自父 POM） / Realm base: Redis starter (for Redis Stream based MQ, version inherited from parent) -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-redis</artifactId>
+        </dependency>
+
+        <!-- Spring Boot 自动配置基础库（必需） / Spring Boot auto-configuration base (required) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!-- Spring Boot 配置元数据生成器（编译时生成 spring-configuration-metadata.json） / Spring Boot configuration metadata processor (generates metadata at compile time) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 消息队列客户端（均为 optional，由使用方自行选择引入） / MQ clients (all optional, chosen by consumers) -->
+
+        <!-- Kafka -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- RabbitMQ -->
+        <dependency>
+            <groupId>org.springframework.amqp</groupId>
+            <artifactId>spring-rabbit</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- RocketMQ -->
+        <dependency>
+            <groupId>org.apache.rocketmq</groupId>
+            <artifactId>rocketmq-spring-boot-starter</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 测试依赖（仅在测试阶段使用；如需针对不同 MQ 进行集成测试，可在此添加对应客户端的 test scope 依赖） / Test dependency (test scope; add per-MQ client test deps here if needed) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

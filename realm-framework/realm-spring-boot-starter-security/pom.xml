@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-spring-boot-starter-security</artifactId>
+    <packaging>jar</packaging>
+
+    <!-- 项目信息 / Project information -->
+    <name>${project.artifactId}</name>
+    <description>
+        1. security：用户认证与授权，实现“谁”可以对“什么”做什么。
+        2. operatelog：操作日志，记录“谁”在“什么时间”对“谁”做了什么。
+        1. security: user authentication and authorization, implementing "who" can do "what".
+        2. operatelog: operation log, recording "who" did "what" to "whom" at "what time".
+    </description>
+    <!-- 请替换为实际项目地址 / Replace with actual project URL -->
+    <url>https://github.com/</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!-- 通用基础库 / Common library -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-common</artifactId>
+        </dependency>
+
+        <!-- Spring Boot AOP starter / Spring Boot AOP starter -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!-- Web 支持 / Web support -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Spring Boot 配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Spring Security 核心 / Spring Security core -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- RPC 组件（可选：用于远程调用） / RPC starter (optional: for remote procedure calls) -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-rpc</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 业务模块依赖（可选：用于 Token 校验；如启用请取消注释） / Business module dependency (optional: Token validation; uncomment to enable) -->
+        <!--
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-module-system-api</artifactId>
+            <version>${revision}</version>
+        </dependency>
+        -->
+
+        <!-- 工具类库：Google Guava / Utility libraries: Google Guava -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+        </dependency>
+
+        <!-- 操作日志组件：BizLog SDK / Operation log component: BizLog SDK -->
+        <dependency>
+            <groupId>io.github.mouzt</groupId>
+            <artifactId>bizlog-sdk</artifactId>
+        </dependency>
+
+    </dependencies>
+
+</project>

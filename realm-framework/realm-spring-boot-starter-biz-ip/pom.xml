@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-spring-boot-starter-biz-ip</artifactId>
+    <packaging>jar</packaging>
+
+    <!-- 项目信息 / Project information -->
+    <name>${project.artifactId}</name>
+    <description>
+        IP 拓展，支持如下功能 / IP extension with the following features:
+        1. IP 功能：查询 IP 对应的城市信息 / IP lookup: resolve city info from an IP address
+        基于 https://gitee.com/lionsoul/ip2region 实现 / Based on ip2region
+        2. 城市功能：查询城市编码对应的城市信息 / City lookup: resolve city info from a city code
+        基于 https://github.com/modood/Administrative-divisions-of-China 实现 / Based on Administrative-divisions-of-China
+    </description>
+    <!-- 请替换为实际项目地址 / Replace with actual project URL -->
+    <url>https://github.com/</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!-- 通用基础库 / Common library -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-common</artifactId>
+        </dependency>
+
+        <!-- IP 地址查询库 / IP address lookup library -->
+        <dependency>
+            <groupId>org.lionsoul</groupId>
+            <artifactId>ip2region</artifactId>
+        </dependency>
+
+        <!-- Lombok（减少样板代码） / Lombok (boilerplate reduction) -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+
+        <!-- SLF4J 日志门面（provided：仅工具类需要编译时依赖） / SLF4J logging facade (provided: compile-time only for utilities) -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- 测试组件 / Test starter -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

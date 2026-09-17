@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理；artifactId 必须是父 POM 的 artifactId，即 realm） / Parent POM (version ${revision} managed by parent; artifactId must be the parent's artifactId, i.e. realm) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 打包类型 / Packaging type -->
+    <packaging>pom</packaging>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-framework</artifactId>
+
+    <!-- 模块定义（技术组件聚合，每个子模块代表一个组件） / Module definitions (aggregator of technical components; each submodule is one component) -->
+    <modules>
+        <module>realm-common</module>
+        <module>realm-spring-boot-starter-mybatis</module>
+        <module>realm-spring-boot-starter-redis</module>
+        <module>realm-spring-boot-starter-web</module>
+        <module>realm-spring-boot-starter-security</module>
+        <module>realm-spring-boot-starter-monitor</module>
+        <module>realm-spring-boot-starter-job</module>
+        <module>realm-spring-boot-starter-rpc</module>
+        <module>realm-spring-boot-starter-excel</module>
+        <module>realm-spring-boot-starter-test</module>
+        <module>realm-spring-boot-starter-biz-data-permission</module>
+        <module>realm-spring-boot-starter-biz-ip</module>
+        <module>realm-spring-boot-starter-env</module>
+        <module>realm-spring-boot-starter-mq</module>
+        <module>realm-spring-boot-starter-websocket</module>
+        <module>realm-spring-boot-starter-protection</module>
+        <module>realm-spring-boot-starter-biz-tenant</module>
+    </modules>
+
+    <!-- 项目信息：本模块是技术组件聚合层 / Project info: aggregator layer for technical components -->
+    <description>
+        该包是技术组件聚合层，每个子模块代表一个组件。每个组件包括两部分：
+        1. core 包：该组件的核心封装。
+        2. config 包：该组件基于 Spring 的配置。
+
+        技术组件分为两类：
+        1. 框架组件：对 MyBatis、Redis 等第三方库的拓展。
+        2. 业务组件：与业务相关的组件封装，例如数据字典、操作日志等；若为业务组件，artifactId 会包含 biz。
+
+        This module is an aggregator of technical components; each submodule is one component.
+        Each component contains two parts:
+        1. core package: the core encapsulation of the component.
+        2. config package: the Spring-based configuration of the component.
+
+        Technical components fall into two categories:
+        1. Framework components: extensions to third-party libraries such as MyBatis, Redis, etc.
+        2. Business components: business-related encapsulations such as data dictionaries, operation logs, etc.
+        If it is a business component, the artifactId contains "biz".
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+</project>

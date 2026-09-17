@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-gateway</artifactId>
+    <packaging>jar</packaging>
+
+    <!-- 项目信息 / Project information -->
+    <name>${project.artifactId}</name>
+    <description>
+        分布式 API 网关服务，基于 Spring Cloud Gateway 实现路由转发、流量控制和安全防护。
+        Distributed API gateway service built on Spring Cloud Gateway, providing
+        routing, traffic control, and security protection.
+    </description>
+    <!-- 请替换为实际项目地址 / Replace with actual project URL -->
+    <url>https://github.com/</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!-- 业务模块依赖 / Business module dependencies -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-module-system-api</artifactId>
+            <version>${revision}</version>
+            <exclusions>
+                <!-- 排除冲突的 OpenAPI 依赖 / Exclude conflicting OpenAPI dependencies -->
+                <exclusion>
+                    <groupId>org.springdoc</groupId>
+                    <artifactId>springdoc-openapi-webmvc-core</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- 网关核心组件 / Gateway core components -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
+        </dependency>
+
+        <!-- 服务治理：RPC 负载均衡 / Service governance: load balancing -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+        </dependency>
+        <!-- 服务注册发现（Nacos） / Service registry & discovery (Nacos) -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+        </dependency>
+        <!-- 配置中心（Nacos） / Config center (Nacos) -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+        </dependency>
+
+        <!-- 网关辅助功能：API 文档集成（Knife4j Gateway，版本由父 POM 统一管理） / Gateway auxiliary: API documentation (Knife4j Gateway) -->
+        <dependency>
+            <groupId>com.github.xiaoymin</groupId>
+            <artifactId>knife4j-gateway-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- 监控告警 / Monitoring & alerting -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-monitor</artifactId>
+        </dependency>
+
+        <!-- 工具类库：Google Guava / Utility libraries: Google Guava -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+        </dependency>
+
+        <!-- Caffeine 本地缓存（必需，避免因缺少本地缓存实现导致告警） / Caffeine cache (required to avoid missing local cache warnings) -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
+    </dependencies>
+
+    <!-- 构建配置 / Build configuration -->
+    <build>
+        <!-- 设置构建的 JAR 包名 / Set the final JAR name -->
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <!-- Spring Boot 打包插件（将应用打包为包含全部依赖的可执行 JAR） / Spring Boot Maven Plugin (repackage as executable JAR) -->
+            <!-- 版本由父 POM 的 pluginManagement 或 spring-boot-dependencies 统一管理，此处无需显式声明 -->
+            <!-- Version managed by parent POM; no explicit version needed here -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <!-- 将依赖一同打入最终包 / Repackage with all dependencies -->
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

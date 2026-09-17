@@ -1,0 +1,226 @@
+# Spring Boot 应用核心配置 / Spring Boot application core configuration
+
+spring:
+  application:
+    # 应用名称 / Application name
+    name: infra-server
+
+  profiles:
+    # 当前激活的配置文件 / Active profile
+    active: local
+
+  main:
+    # 允许循环依赖（三层架构不可避免） / Allow circular references (unavoidable in layered architecture)
+    allow-circular-references: true
+    # 允许 Bean 覆盖（如 Feign 重复定义） / Allow bean definition overriding (e.g. duplicate Feign definitions)
+    allow-bean-definition-overriding: true
+
+  config:
+    import:
+      # 加载本地配置 / Load local profile config
+      - optional:classpath:application-${spring.profiles.active}.yaml
+      # 加载 Nacos 配置 / Load Nacos config
+      - optional:nacos:${spring.application.name}-${spring.profiles.active}.yaml
+
+  # Servlet 文件上传配置 / Servlet multipart configuration
+  servlet:
+    multipart:
+      # 单个文件最大大小 / Max file size
+      max-file-size: 16MB
+      # 总请求大小限制 / Max request size
+      max-request-size: 32MB
+
+  # Jackson 序列化配置 / Jackson serialization
+  jackson:
+    serialization:
+      # LocalDateTime 使用时间戳 / Use timestamps for LocalDateTime
+      write-dates-as-timestamps: true
+      # 不使用纳秒级时间戳 / Disable nanosecond timestamps
+      write-date-timestamps-as-nanoseconds: false
+      # Duration 使用时间戳 / Use timestamps for Duration
+      write-durations-as-timestamps: true
+      # 允许序列化无属性的 Bean / Allow serializing empty beans
+      fail-on-empty-beans: false
+
+  # 缓存配置（Redis） / Cache configuration (Redis)
+  cache:
+    type: REDIS
+    redis:
+      # 缓存过期时间 1 小时 / TTL 1 hour
+      time-to-live: 1h
+
+  # Spring Data Redis 配置 / Spring Data Redis
+  data:
+    redis:
+      repositories:
+        # 未使用 Repository，禁用加快启动 / Disable to speed up startup
+        enabled: false
+
+  # Kafka 配置（消息队列） / Kafka configuration (message queue)
+  kafka:
+    producer:
+      # 0-不应答，1-leader 应答，all-全部应答 / Acks mode: 0=none, 1=leader, all=all
+      acks: 1
+      # 重试次数 / Retry count
+      retries: 3
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      # 消费偏移重置策略 / Offset reset policy
+      auto-offset-reset: earliest
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: '*'
+    listener:
+      # 主题不存在不报错 / Do not fail on missing topics
+      missing-topics-fatal: false
+
+# Web 服务器配置 / Web server configuration
+
+server:
+  # 服务端口 / Server port
+  port: 48082
+
+# 日志配置 / Logging configuration
+
+logging:
+  file:
+    # 日志文件路径 / Log file path
+    name: ${user.home}/logs/${spring.application.name}.log
+
+# 接口文档配置（SpringDoc + Knife4j） / API documentation (SpringDoc + Knife4j)
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui
+  # 参见 Knife4j 文档 / See Knife4j docs
+  default-flat-param-object: true
+
+knife4j:
+  enable: true
+  setting:
+    # 界面语言 / UI language
+    language: zh_cn
+
+# MyBatis-Plus 配置 / MyBatis-Plus configuration
+
+mybatis-plus:
+  configuration:
+    # 下划线转驼峰 / Enable underscore-to-camel mapping
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      # “智能”模式，根据数据源自动适配 AUTO/INPUT / Smart mode: auto-adapts AUTO/INPUT per datasource
+      id-type: NONE
+      # 逻辑已删除值 / Deleted value
+      logic-delete-value: 1
+      # 逻辑未删除值 / Not deleted value
+      logic-not-delete-value: 0
+    # 关闭 Banner / Disable banner
+    banner: false
+  type-aliases-package: ${realm.info.base-package}.dal.dataobject
+  encryptor:
+    # AES 加密密钥（可在线生成） / AES encryption key (can be generated online)
+    password: XDV71a+xqStEA3WH
+
+mybatis-plus-join:
+  # 关闭 Banner / Disable banner
+  banner: false
+
+# 数据翻译（Easy-Trans） / Data translation (Easy-Trans)
+
+easy-trans:
+  # 关闭全局翻译（性能考虑） / Disable global translation for performance
+  is-enable-global: false
+
+# RocketMQ 配置（消息队列） / RocketMQ configuration (message queue)
+
+rocketmq:
+  producer:
+    # 生产者分组 / Producer group
+    group: ${spring.application.name}_PRODUCER
+
+# XXL-JOB 分布式任务调度配置 / XXL-JOB distributed job scheduling
+
+xxl:
+  job:
+    executor:
+      # 执行器 AppName / Executor app name
+      appname: ${spring.application.name}
+      # 日志路径 / Log path
+      logpath: ${user.home}/logs/xxl-job/${spring.application.name}
+    # 通讯 Token / Access token
+    accessToken: default_token
+
+# 项目自定义配置（Realm Framework） / Project custom configuration (Realm Framework)
+
+realm:
+  info:
+    version: 1.0.0
+    # 业务模块基础包 / Base package of business modules
+    base-package: cn.realm.module.infra
+
+  web:
+    admin-ui:
+      # 管理后台 UI 地址 / Admin UI URL
+      url: http://dashboard.realm.cn
+
+  xss:
+    # 是否开启 XSS 过滤 / Enable XSS filter
+    enable: false
+    exclude-urls:
+      # 排除 Spring Boot Admin 端点 / Exclude Spring Boot Admin endpoints
+      - ${spring.boot.admin.context-path}/**
+      # 排除 Actuator 端点 / Exclude Actuator endpoints
+      - ${management.endpoints.web.base-path}/**
+
+  websocket:
+    # 是否启用 WebSocket / Enable WebSocket
+    enable: true
+    # WebSocket 路径 / WebSocket path
+    path: /infra/ws
+    # 消息发送类型：local/redis/rocketmq/kafka/rabbitmq / Sender type
+    sender-type: local
+    sender-rocketmq:
+      topic: ${spring.application.name}-websocket
+      consumer-group: ${spring.application.name}-websocket-consumer
+    sender-rabbitmq:
+      exchange: ${spring.application.name}-websocket-exchange
+      queue: ${spring.application.name}-websocket-queue
+    sender-kafka:
+      topic: ${spring.application.name}-websocket
+      consumer-group: ${spring.application.name}-websocket-consumer
+
+  swagger:
+    title: 管理后台 / Admin console
+    description: 提供管理员管理的所有功能 / Provides all admin management capabilities
+    version: ${realm.info.version}
+
+  codegen:
+    base-package: cn.realm
+    db-schemas: ${spring.datasource.dynamic.datasource.master.name}
+    # 前端模板类型，参见 CodegenFrontTypeEnum / Frontend template type
+    front-type: 20
+    # VO 类型，参见 CodegenVOTypeEnum / VO type
+    vo-type: 10
+    # 是否生成批量删除接口 / Generate batch delete API
+    delete-batch-enable: true
+    # 是否生成单元测试 / Generate unit tests
+    unit-test-enable: false
+    # 是否生成 Excel 导入接口 / Generate Excel import API
+    import-enable: false
+
+  tenant:
+    # 是否启用多租户 / Enable multi-tenancy
+    enable: true
+    # 忽略租户的 URL（可配置） / Ignore tenant URLs
+    ignore-urls: []
+    # 忽略租户过滤的表 / Ignore tenant tables
+    ignore-tables: []
+
+# 调试模式 / Debug mode
+
+debug: false

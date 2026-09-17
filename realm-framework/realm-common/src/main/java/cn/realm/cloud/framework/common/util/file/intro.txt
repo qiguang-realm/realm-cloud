@@ -1,0 +1,19 @@
+📁 文件处理工具集
+│
+├── 📄 现有工具类（3个）
+│   ├── FileConverter      — 格式转换（byte[] ↔ File ↔ InputStream ↔ MultipartFile）
+│   ├── FileReaderUtil     — 内容读取（Excel/CSV/TXT/JSON）
+│   └── FileUtil           — 文件操作（路径/MD5/压缩/解压/大厂安全规范）
+│
+├── 🆕 推荐新增（5个）
+│   ├── FilePreviewUtil    — 文件预览（PDF/Word/Excel/PPT/图片）【京东/Google参考】
+│   ├── FileVersionUtil    — 版本管理（历史版本/还原）【京东云盘参考】
+│   ├── FileStorageUtil    — 统一存储抽象（OSS/MinIO/本地）【阿里云参考】
+│   ├── FileChunkUtil      — 分片上传/断点续传【阿里云OSS参考】
+│   └── FileMetadataUtil   — 元数据/标签管理【京东云盘参考】
+│
+└── 📌 可选扩展（根据需求）
+    ├── FileMonitorUtil     — 文件监控/变更监听【字节DeerFlow参考】
+    ├── FileBatchUtil       — 批量文件处理【腾讯WorkBuddy参考】
+    ├── FileSecurityUtil    — 安全扫描/病毒检测【字节安全规范参考】
+    └── FileAsyncUtil       — 异步文件处理【Redis+Kafka参考】

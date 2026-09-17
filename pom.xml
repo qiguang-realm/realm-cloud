@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 项目坐标 / Project coordinates -->
+    <groupId>cn.realm.cloud</groupId>
+    <artifactId>realm</artifactId>
+    <version>${revision}</version>
+    <packaging>pom</packaging>
+
+    <!-- 项目信息 / Project information -->
+    <name>${project.artifactId}</name>
+    <description>
+        Parent POM for the Realm project, centralizing dependency version management
+        and build plugin configurations for all submodules.
+    </description>
+    <url>https://github.com/your-org/realm</url>
+
+    <!-- 模块定义（按字母排序） / Module definitions (sorted alphabetically) -->
+    <modules>
+        <module>realm-dependencies</module>
+        <module>realm-framework</module>
+        <module>realm-gateway</module>
+        <module>realm-module-infra</module>
+        <module>realm-module-system</module>
+        <module>realm-server</module>
+    </modules>
+
+    <!-- 属性（版本单一来源） / Properties (single source of truth for versions) -->
+    <properties>
+        <!-- 项目版本 / Project version -->
+        <revision>2026.08-SNAPSHOT</revision>
+
+        <!-- JDK 版本 / JDK version -->
+        <java.version>17</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- 核心插件版本 / Core plugin versions -->
+        <maven-compiler-plugin.version>3.14.0</maven-compiler-plugin.version>
+        <maven-surefire-plugin.version>3.5.3</maven-surefire-plugin.version>
+        <flatten-maven-plugin.version>1.7.2</flatten-maven-plugin.version>
+
+        <!-- 核心依赖版本 / Core dependency versions -->
+        <spring-boot.version>3.5.15</spring-boot.version>
+        <lombok.version>1.18.38</lombok.version>
+        <mapstruct.version>1.6.3</mapstruct.version>
+        <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
+    </properties>
+
+    <!-- 依赖管理（仅版本，不实际导入） / Dependency management (versions only, no actual imports) -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- 导入 BOM 模块以集中管理所有第三方依赖版本 / Import the BOM module to centrally manage all third-party dependency versions -->
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-dependencies</artifactId>
+                <version>${revision}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- 构建配置 / Build configuration -->
+    <build>
+        <!-- 插件管理（子模块继承的默认配置） / Plugin management (default configurations inherited by submodules) -->
+        <pluginManagement>
+            <plugins>
+                <!-- 编译器插件：为 Lombok 和 MapStruct 配置注解处理器 / Compiler plugin: configures annotation processors for Lombok and MapStruct -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
+                    <configuration>
+                        <release>${java.version}</release>
+                        <annotationProcessorPaths>
+                            <!-- Spring Boot 配置元数据生成器 / Spring Boot configuration metadata generator -->
+                            <path>
+                                <groupId>org.springframework.boot</groupId>
+                                <artifactId>spring-boot-configuration-processor</artifactId>
+                                <version>${spring-boot.version}</version>
+                            </path>
+                            <!-- Lombok 注解处理器 / Lombok annotation processor -->
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                            <!-- Lombok-MapStruct 绑定，确保二者协同工作 / Lombok-MapStruct binding to ensure they work together -->
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok-mapstruct-binding</artifactId>
+                                <version>${lombok-mapstruct-binding.version}</version>
+                            </path>
+                            <!-- MapStruct 代码生成器 / MapStruct code generator -->
+                            <path>
+                                <groupId>org.mapstruct</groupId>
+                                <artifactId>mapstruct-processor</artifactId>
+                                <version>${mapstruct.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                        <compilerArgs>
+                            <!-- 保留方法参数名，适配 Spring Boot 3+ / Preserve method parameter names for Spring Boot 3+ -->
+                            <arg>-parameters</arg>
+                        </compilerArgs>
+                    </configuration>
+                </plugin>
+
+                <!-- 测试插件 / Test plugin -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven-surefire-plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
+        <!-- 全局插件（应用于所有模块） / Global plugins (applied to all modules) -->
+        <plugins>
+            <!-- Flatten Maven 插件：发布时将 ${revision} 替换为实际版本 / Flatten Maven Plugin: replaces ${revision} with actual version during release -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>${flatten-maven-plugin.version}</version>
+                <configuration>
+                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                    <updatePomFile>true</updatePomFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten-clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <!-- 建议：在 ~/.m2/settings.xml 中配置镜像仓库，而不是在项目 POM 中配置 / Recommendation: configure mirrors in ~/.m2/settings.xml instead of project POM -->
+
+</project>

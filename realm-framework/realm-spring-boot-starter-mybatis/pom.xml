@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-spring-boot-starter-mybatis</artifactId>
+    <packaging>jar</packaging>
+
+    <!-- 项目信息 / Project information -->
+    <name>${project.artifactId}</name>
+    <description>
+        数据库连接池、多数据源、事务管理及 MyBatis 扩展支持。
+        Database connection pool, multi-datasource, transaction management,
+        and MyBatis extension support.
+    </description>
+    <!-- 请替换为实际项目地址 / Replace with actual project URL -->
+    <url>https://github.com/</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控，依赖按功能分组便于阅读） / Dependencies (all versions managed by parent; grouped by functional area) -->
+    <dependencies>
+
+        <!-- 基础工具类：提供 Realm 通用工具和基础 POJO / Foundation utilities: Realm common utilities and base POJOs -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-common</artifactId>
+        </dependency>
+
+        <!-- Web 与安全（provided：仅用于 OncePerRequestFilter，安全实现由使用方在运行时提供） / Web & security (provided: used only by OncePerRequestFilter; security impl provided by consumers at runtime) -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-security</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- 默认数据库驱动（默认包含 MySQL 驱动） / Default database driver (MySQL included by default) -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+        </dependency>
+
+        <!-- 可选数据库驱动（标记为 optional，由使用方按需引入） / Optional database drivers (marked optional; consumers add the driver they need) -->
+        <!-- Oracle 驱动 / Oracle driver -->
+        <dependency>
+            <groupId>com.oracle.database.jdbc</groupId>
+            <artifactId>ojdbc8</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- PostgreSQL 驱动 / PostgreSQL driver -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- SQL Server 驱动 / SQL Server driver -->
+        <dependency>
+            <groupId>com.microsoft.sqlserver</groupId>
+            <artifactId>mssql-jdbc</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- 达梦数据库驱动 / Dameng database driver -->
+        <dependency>
+            <groupId>com.dameng</groupId>
+            <artifactId>DmJdbcDriver18</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- 人大金仓驱动 / Kingbase database driver -->
+        <dependency>
+            <groupId>cn.com.kingbase</groupId>
+            <artifactId>kingbase8</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- 华为 openGauss 驱动 / Huawei openGauss driver -->
+        <dependency>
+            <groupId>org.opengauss</groupId>
+            <artifactId>opengauss-jdbc</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 连接池（Druid：阿里巴巴 Druid 连接池，与 Spring Boot 3 集成） / Connection pool (Alibaba Druid with Spring Boot 3 integration) -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>druid-spring-boot-3-starter</artifactId>
+        </dependency>
+
+        <!-- MyBatis-Plus 增强（核心、SQL 解析器、联表查询支持） / MyBatis-Plus enhancements (core, SQL parser, join query support) -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.yulichang</groupId>
+            <artifactId>mybatis-plus-join-boot-starter</artifactId>
+        </dependency>
+
+        <!-- 多数据源支持（动态数据源路由，与 Spring Boot 3 集成；排除 Undertow 避免不必要的依赖） / Multi-datasource support (dynamic routing with Spring Boot 3; Undertow excluded) -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>dynamic-datasource-spring-boot3-starter</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-undertow</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- 数据翻译（Easy-Trans：提供 VO 数据翻译功能，集成 MyBatis-Plus） / Data translation (Easy-Trans: VO translation with MyBatis-Plus integration) -->
+        <dependency>
+            <groupId>com.fhs-opensource</groupId>
+            <artifactId>easy-trans-spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fhs-opensource</groupId>
+            <artifactId>easy-trans-mybatis-plus-extend</artifactId>
+        </dependency>
+
+    </dependencies>
+
+</project>

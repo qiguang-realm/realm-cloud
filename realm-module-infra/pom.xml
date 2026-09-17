@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理；artifactId 必须是父 POM 的 artifactId，即 realm） / Parent POM (version ${revision} managed by parent; artifactId must be the parent's artifactId, i.e. realm) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-module-infra</artifactId>
+    <packaging>pom</packaging>
+
+    <!-- 项目信息 / Project information -->
+    <name>${project.artifactId}</name>
+    <description>
+        infra 模块：基础设施运维（定时任务、服务器信息等）+ 研发工具（代码生成器、接口文档等）。
+        Infrastructure operations (scheduling, server info) + development tools (code generator, API docs).
+    </description>
+
+    <!-- 子模块（按字母顺序） / Submodules (alphabetical) -->
+    <modules>
+        <!-- API 定义 / API definition -->
+        <module>realm-module-infra-api</module>
+        <!-- 服务实现 / Server implementation -->
+        <module>realm-module-infra-server</module>
+    </modules>
+
+</project>

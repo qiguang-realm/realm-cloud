@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理；未指定 relativePath，Maven 按默认顺序查找） / Parent POM (version ${revision} managed by parent; relativePath omitted) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-spring-boot-starter-protection</artifactId>
+    <packaging>jar</packaging>
+
+    <!-- 项目信息 / Project information -->
+    <name>${project.artifactId}</name>
+    <description>
+        服务保障 starter，提供分布式锁、幂等、限流、熔断等能力。
+        Service protection starter providing distributed locks, idempotency,
+        rate limiting, circuit breaking, etc.
+    </description>
+    <!-- 请替换为实际仓库地址 / Replace with actual repository URL -->
+    <url>https://github.com/your-org/realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控，依赖按功能分组） / Dependencies (all versions managed by parent; grouped by functional area) -->
+    <dependencies>
+
+        <!-- Web 框架（provided：限流与幂等功能需要；provided 作用域允许使用方自行选择 Web 栈） / Web framework (provided: required for rate limiting & idempotency; provided lets consumers choose their web stack) -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-web</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Redis 集成（提供分布式锁存储、限流计数器、幂等键持久化） / Redis integration (distributed lock storage, rate limit counters, idempotency key persistence) -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-redis</artifactId>
+        </dependency>
+
+        <!-- 分布式锁实现（optional：使用方可按需替换为自有锁机制） / Distributed lock implementation (optional: consumers may replace with their own lock mechanism) -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>lock4j-redisson-spring-boot-starter</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 测试支持（为保护功能提供单元/集成测试的测试工具与 Mock 环境） / Test support (test utilities & mock environment for unit/integration testing) -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

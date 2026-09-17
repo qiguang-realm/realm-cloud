@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理；artifactId 必须是父 POM 的 artifactId，即 realm） / Parent POM (version ${revision} managed by parent; artifactId must be the parent's artifactId, i.e. realm) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId；packaging=pom 表示聚合模块） / Project coordinates (inherits groupId & version; packaging=pom indicates an aggregator module) -->
+    <artifactId>realm-module-system</artifactId>
+    <packaging>pom</packaging>
+
+    <!-- 项目信息 / Project information -->
+    <name>${project.artifactId}</name>
+    <description>
+        system 模块是平台的核心基础模块，主要包含：
+        - 用户、角色、权限等基础身份管理
+        - 组织架构（部门、岗位等）
+        - 数据字典、系统配置等通用功能
+        为上层业务模块提供基础支撑能力。
+
+        The system module is the core foundational module of the platform, mainly including:
+        - User, role, and permission management
+        - Organization structure (departments, positions, etc.)
+        - Data dictionary, system configuration, and other common features
+        It provides foundational support capabilities for upper-level business modules.
+    </description>
+
+    <!-- 子模块定义（按字母顺序排列，便于维护） / Module definitions (sorted alphabetically for maintainability) -->
+    <modules>
+        <!-- 系统模块 API 定义（供其他模块依赖） / API definitions for the system module (for other modules to depend on) -->
+        <module>realm-module-system-api</module>
+        <!-- 系统模块服务端实现（包含具体业务逻辑） / Server implementation of the system module (contains business logic) -->
+        <module>realm-module-system-server</module>
+    </modules>
+
+</project>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-module-system</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-module-system-api</artifactId>
+    <packaging>jar</packaging>
+
+    <!-- 项目信息：仅包含 DTO、枚举、Feign 客户端等跨模块调用契约，不引入运行时实现 / Project info: only DTOs, enums, Feign clients and other cross-module contracts -->
+    <name>${project.artifactId}</name>
+    <description>
+        系统模块 API 定义，包含 DTO、枚举、Feign 客户端等跨模块调用契约。
+        API definitions for the system module, including DTOs, enums,
+        Feign clients, and other cross-module invocation contracts.
+    </description>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!-- 基础依赖：通用工具类与基础 POJO / Foundation: common utilities & base POJOs -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-common</artifactId>
+        </dependency>
+
+        <!-- 接口文档支持（provided：使用最新版 Swagger 模型，运行时由具体模块提供实现） / API documentation support (provided: latest Swagger models, runtime impl provided by consumer) -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- 参数校验支持（optional：提供校验注解，不强制依赖传递） / Validation support (optional: provides validation annotations, not forcibly propagated) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 远程调用支持：Feign（optional：提供 Feign 客户端支持，按需启用） / Remote call support: Feign (optional: enabled on demand) -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+    </dependencies>
+
+</project>
