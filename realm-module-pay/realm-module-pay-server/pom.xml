@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-module-pay</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-module-pay-server</artifactId>
+    <packaging>jar</packaging>
+
+    <!-- 项目信息：支付业务的服务端实现（商户、应用、支付、退款等） / Project info: server-side implementation of the pay module (merchants, applications, payments, refunds, etc.) -->
+    <name>${project.artifactId}</name>
+    <description>
+        pay 模块，支付业务，提供业务的支付能力。
+        例如说：商户、应用、支付、退款等等。
+
+        The pay module, providing payment capabilities for business scenarios,
+        such as merchants, applications, payments, refunds, etc.
+    </description>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!-- 框架基础：环境拓展（特性环境能力） / Framework foundation: env extension (feature environment capability) -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-env</artifactId>
+        </dependency>
+
+        <!-- 内部模块 API：system 与 pay 模块接口定义 / Internal module APIs: system and pay interface definitions -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-module-system-api</artifactId>
+            <version>${revision}</version>
+        </dependency>
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-module-pay-api</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
+        <!-- 业务组件：多租户支持 / Business component: multi-tenancy support -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-biz-tenant</artifactId>
+        </dependency>
+
+        <!-- Web 与安全：安全框架 / Web & security: security framework -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- 数据库与持久化：MyBatis 与 Redis / Database & persistence: MyBatis and Redis -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-mybatis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-redis</artifactId>
+        </dependency>
+
+        <!-- 微服务与 RPC：Feign 客户端与 Nacos 注册/配置中心 / Microservices & RPC: Feign client and Nacos registry/config center -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-rpc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+        </dependency>
+
+        <!-- 定时任务 / Job scheduling -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-job</artifactId>
+        </dependency>
+
+        <!-- 工具类：Excel 拓展 / Utility: Excel extension -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-excel</artifactId>
+        </dependency>
+
+        <!-- 监控组件 / Monitoring starter -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-monitor</artifactId>
+        </dependency>
+
+        <!-- 第三方支付 SDK：支付宝与微信支付 / Third-party payment SDKs: Alipay & WeChat Pay -->
+        <dependency>
+            <groupId>com.alipay.sdk</groupId>
+            <artifactId>alipay-sdk-java</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.binarywang</groupId>
+            <artifactId>weixin-java-pay</artifactId>
+        </dependency>
+
+        <!-- 测试组件（test 作用域） / Test starter (test scope) -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <!-- 构建配置 / Build configuration -->
+    <build>
+        <!-- 设置构建的 JAR 包名 / Set the final JAR name -->
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <!-- Spring Boot 打包插件（将应用打包为包含全部依赖的可执行 JAR） / Spring Boot Maven Plugin (repackage as executable JAR) -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring-boot.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <!-- 将依赖一同打入最终包 / Repackage with all dependencies -->
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

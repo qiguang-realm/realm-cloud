@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.exceptions.MybatisPlusException;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.generator.FastAutoGenerator;
 import com.baomidou.mybatisplus.generator.config.OutputFile;
+import com.baomidou.mybatisplus.generator.config.rules.DbColumnType;
 import com.baomidou.mybatisplus.generator.config.rules.NamingStrategy;
 import com.baomidou.mybatisplus.generator.engine.FreemarkerTemplateEngine;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.ibatis.type.JdbcType;
 
 import java.util.Collections;
 import java.util.Scanner;
@@ -27,9 +29,7 @@ public class MyBatisPlusGenerator {
 
     // ---------- MySQL 配置（当前启用） ----------
     private static final String JDBC_URL =
-            "jdbc:mysql://127.0.0.1:3306/database?useSSL=true&allowPublicKeyRetrieval=true" +
-                    "&useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai" +
-                    "&rewriteBatchedStatements=true";
+            "jdbc:mysql://127.0.0.1:3306/realm?useUnicode=true&characterEncoding=utf8&sslMode=DISABLED&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true";
     private static final String USERNAME = "root";
     private static final String PASSWORD = "root";
 
@@ -62,6 +62,15 @@ public class MyBatisPlusGenerator {
 
             // 构建快速生成器并执行（链式调用）
             FastAutoGenerator.create(JDBC_URL, USERNAME, PASSWORD)
+                    // ---------- 自定义类型转换器（将 TINYINT 强制映射为 Integer） ----------
+                    .dataSourceConfig(builder -> builder
+                            .typeConvertHandler((globalConfig, typeRegistry, metaInfo) -> {
+                                if (metaInfo.getJdbcType() == JdbcType.TINYINT) {
+                                    return DbColumnType.INTEGER;
+                                }
+                                return typeRegistry.getColumnType(metaInfo);
+                            })
+                    )
                     // ---------- 全局配置 ----------
                     .globalConfig(builder -> {
                         builder.author("QI Guang")                    // 作者名
@@ -94,7 +103,7 @@ public class MyBatisPlusGenerator {
                                 // 设置表名前缀，生成实体类时会自动去除这些前缀（支持多个）
                                 // 此处会去除 "system_" 前缀，以及 "模块名_" 前缀（例如 "user_"）
                                 // 例如表名 "system_user_role" → 生成实体类 "UserRole"
-                                .addTablePrefix("system_", moduleName + "_")
+                                .addTablePrefix("iam_", moduleName + "_")
                                 // ------------------ 实体类策略 ------------------
                                 .entityBuilder()
                                 .enableLombok()                           // 使用 Lombok 注解（@Data, @Accessors 等）
@@ -111,6 +120,8 @@ public class MyBatisPlusGenerator {
                                 .formatServiceImplFileName("%sServiceImpl") // Service 实现类命名规则（例如 UserServiceImpl）
                                 // ------------------ Mapper 策略 ------------------
                                 .mapperBuilder()
+                                // ★ 关键：生成时自动在接口上添加 @Mapper 注解
+                                .mapperAnnotation(org.apache.ibatis.annotations.Mapper.class)
 //                                .enableBaseResultMap()                   // 生成 BaseResultMap（MyBatis 的 resultMap 配置）
 //                                .enableBaseColumnList()                  // 生成 BaseColumnList（MyBatis 的 sql 片段，包含所有字段）
                                 .formatMapperFileName("%sMapper")        // Mapper 接口命名规则（例如 UserMapper）

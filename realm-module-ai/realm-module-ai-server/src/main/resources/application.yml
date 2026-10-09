@@ -1,0 +1,252 @@
+# ============================================================
+# AI 模块启动配置（ai-server）
+# ============================================================
+
+spring:
+  # ---- 应用基础 ----
+  application:
+    name: ai-server
+
+  profiles:
+    active: local # 环境：local / dev / test / prod
+
+  main:
+    allow-circular-references: true # 三层架构需要
+    allow-bean-definition-overriding: true # 解决 Feign 重复定义
+
+  # ---- 配置导入 ----
+  config:
+    import:
+      - optional:classpath:application-${spring.profiles.active}.yml # 本地配置
+      - optional:nacos:${spring.application.name}-${spring.profiles.active}.yml # Nacos 配置
+
+  # ---- 文件上传 ----
+  servlet:
+    multipart:
+      max-file-size: 16MB # 单文件上限
+      max-request-size: 32MB # 请求总上限
+
+  # ---- Jackson 序列化 ----
+  jackson:
+    serialization:
+      write-dates-as-timestamps: true # 时间类型用时间戳
+      write-date-timestamps-as-nanoseconds: false # 禁用纳秒时间戳
+      write-durations-as-timestamps: true # Duration 用时间戳
+      fail-on-empty-beans: false # 允许序列化无属性 Bean
+
+  # ---- Redis 缓存 ----
+  cache:
+    type: REDIS
+    redis:
+      time-to-live: 1h # 缓存 TTL
+
+  # ---- Spring AI ----
+  ai:
+    # 向量存储
+    vectorstore:
+      redis:
+        initialize-schema: true
+        index-name: knowledge_index # 向量索引名称
+        prefix: "knowledge_segment:" # 键名前缀
+      qdrant:
+        initialize-schema: true
+        collection-name: knowledge_segment
+        host: 127.0.0.1
+        port: 6334
+      milvus:
+        initialize-schema: true
+        database-name: default
+        collection-name: knowledge_segment
+        client:
+          host: 127.0.0.1
+          port: 19530
+
+    # 模型平台
+    openai:
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      api-key: ${OPENAI_API_KEY:sk-xxxx} # 生产替换
+    azure:
+      openai:
+        endpoint: https://eastusprejade.openai.azure.com
+    anthropic:
+      base-url: ${ANTHROPIC_BASE_URL:https://api.anthropic.com}
+      api-key: ${ANTHROPIC_API_KEY:sk-xxxx} # 生产替换
+    ollama:
+      base-url: http://127.0.0.1:11434
+      chat:
+        model: llama3
+    stabilityai:
+      api-key: ${STABILITYAI_API_KEY:sk-xxxx} # 生产替换
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:sk-xxxx} # 生产替换
+    deepseek:
+      api-key: ${DEEPSEEK_API_KEY:sk-xxxx} # 生产替换
+      chat:
+        options:
+          model: deepseek-v4-flash
+    model:
+      rerank: false # 是否开启通义千问 Rerank
+
+    # MCP
+    mcp:
+      server:
+        enabled: false
+        name: realm-mcp-server
+        version: 1.0.0
+        instructions: 一个 MCP 示例服务 / A sample MCP service
+        sse-endpoint: /sse
+      client:
+        enabled: false
+        name: mcp
+        sse:
+          connections:
+            filesystem:
+              url: http://127.0.0.1:8089
+              sse-endpoint: /sse
+        annotation-scanner:
+          enabled: false # 官方 bug 修复前禁用
+
+# ===== Web 服务器 =====
+server:
+  port: 48090
+  servlet:
+    encoding:
+      enabled: true
+      charset: UTF-8
+      force: true # 避免 AI 流式返回乱码
+
+# ===== 日志 =====
+logging:
+  file:
+    name: ${user.home}/logs/${spring.application.name}.log
+
+# ===== 接口文档 =====
+springdoc:
+  api-docs:
+    enabled: true # Swagger 元数据
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true # Swagger UI 界面
+    path: /swagger-ui
+  default-flat-param-object: true # 参见 Knife4j 文档
+
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn # 界面语言
+
+# ===== MyBatis-Plus =====
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true # 下划线转驼峰
+  global-config:
+    db-config:
+      id-type: NONE # 智能模式，自动适配 AUTO/INPUT
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+    banner: false
+  type-aliases-package: ${realm.info.base-package}.dal.dataobject
+  encryptor:
+    password: XDV71a+xqStEA3WH # AES 加密密钥，可在线生成
+
+mybatis-plus-join:
+  banner: false
+
+# ===== 数据翻译 =====
+easy-trans:
+  is-enable-global: false # 关闭全局翻译，性能考虑
+
+# ===== 定时任务 =====
+xxl:
+  job:
+    executor:
+      appname: ${spring.application.name}
+      logpath: ${user.home}/logs/xxl-job/${spring.application.name}
+    accessToken: default_token # 通讯 Token
+
+# ===== Realm 自定义 =====
+realm:
+  ai:
+    gemini:
+      enable: true
+      api-key: ${GEMINI_API_KEY:sk-xxxx}
+      model: gemini-2.5-flash
+    doubao:
+      enable: true
+      api-key: ${DOUBAO_API_KEY:sk-xxxx}
+      model: doubao-seed-2-1-turbo-260628
+    hunyuan:
+      enable: true
+      api-key: ${HUNYUAN_API_KEY:sk-xxxx}
+      model: hy3-preview
+    siliconflow:
+      enable: true
+      api-key: ${SILICONFLOW_API_KEY:sk-xxxx}
+      model: deepseek-ai/DeepSeek-V4-Pro
+    xinghuo:
+      enable: true
+      api-key: ${XINGHUO_API_KEY:sk-xxxx}
+      model: x2-flash
+    baichuan:
+      enable: true
+      api-key: ${BAICHUAN_API_KEY:sk-xxxx}
+      model: Baichuan-M3
+    yiyan:
+      enable: false
+      api-key: ${YIYAN_API_KEY:sk-xxxx}
+      model: ernie-5.1
+    zhipu:
+      enable: false
+      api-key: ${ZHIPU_API_KEY:sk-xxxx}
+      model: glm-5.2
+    minimax:
+      enable: false
+      api-key: ${MINIMAX_API_KEY:sk-xxxx}
+      model: MiniMax-M3
+    moonshot:
+      enable: false
+      api-key: ${MOONSHOT_API_KEY:sk-xxxx}
+      model: kimi-k2.6
+    stepfun:
+      enable: false
+      api-key: ${STEPFUN_API_KEY:sk-xxxx}
+      model: step-3.7-flash
+    grok:
+      enable: false
+      api-key: ${GROK_API_KEY:sk-xxxx}
+      model: grok-4.3
+    midjourney:
+      enable: true
+      base-url: https://api.holdai.top/mj
+      api-key: ${MIDJOURNEY_API_KEY:sk-xxxx}
+      notify-url: http://127.0.0.1:48090/admin-api/ai/image/midjourney/notify # 需公网可达
+    suno:
+      enable: true
+      base-url: http://127.0.0.1:3001
+    web-search:
+      enable: true
+      api-key: ${WEB_SEARCH_API_KEY:sk-xxxx}
+
+  info:
+    version: 1.0.0
+    base-package: cn.realm.cloud.ai
+
+  web:
+    admin-ui:
+      url: http://dashboard.realm.cn
+
+  xss:
+    enable: false
+    exclude-urls:
+      - ${management.endpoints.web.base-path}/** # Actuator 端点
+
+  swagger:
+    title: 管理后台
+    description: 提供管理员管理的所有功能
+    version: ${realm.info.version}
+
+  tenant:
+    enable: true
+
+# ===== 调试模式 =====
+debug: false

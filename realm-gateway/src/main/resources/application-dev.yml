@@ -1,0 +1,34 @@
+# ============================================================
+# 注册中心 + 配置中心（Nacos）
+# ============================================================
+
+spring:
+  # ---- 注册中心 + 配置中心 ----
+  cloud:
+    nacos:
+      server-addr: 127.0.0.1:8848
+      username:
+      password:
+      discovery:
+        namespace: dev
+        group: DEFAULT_GROUP
+      config:
+        namespace: dev
+        group: DEFAULT_GROUP
+
+  # ---- Spring Boot Admin ----
+  boot:
+    admin:
+      client:
+        instance:
+          service-host-type: IP # 可选：IP / HOST_NAME / CANONICAL_HOST_NAME
+        username: admin
+        password: admin
+
+# ===== 监控 =====
+management:
+  endpoints:
+    web:
+      base-path: /actuator # 默认 /actuator
+      exposure:
+        include: '*' # 开放所有端点，默认仅 health / info

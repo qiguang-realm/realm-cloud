@@ -1,0 +1,186 @@
+# ============================================================
+# Realm Server 基础设施配置
+# ============================================================
+
+# ===== Web 服务器 =====
+server:
+  port: 48080
+
+# ===== Spring 基础设施 =====
+spring:
+  # ---- 自动配置排除 ----
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.vectorstore.qdrant.autoconfigure.QdrantVectorStoreAutoConfiguration # 由 realm-module-ai 手动创建
+      - org.springframework.ai.vectorstore.milvus.autoconfigure.MilvusVectorStoreAutoConfiguration # 由 realm-module-ai 手动创建
+
+  # ---- 数据源 ----
+  datasource:
+    druid:
+      web-stat-filter:
+        enabled: true
+      stat-view-servlet:
+        enabled: true
+        allow: # 留空允许所有
+        url-pattern: /druid/*
+        login-username:
+        login-password:
+      filter:
+        stat:
+          enabled: true
+          log-slow-sql: true # 记录慢 SQL
+          slow-sql-millis: 100 # 慢 SQL 阈值（毫秒）
+          merge-sql: true
+        wall:
+          config:
+            multi-statement-allow: true # 允许多语句
+
+    dynamic:
+      primary: master
+      druid:
+        initial-size: 5 # 初始连接数
+        min-idle: 10 # 最小空闲连接
+        max-active: 20 # 最大活跃连接
+        max-wait: 60000 # 获取连接超时（毫秒）
+        time-between-eviction-runs-millis: 60000 # 空闲连接检测间隔
+        min-evictable-idle-time-millis: 600000 # 最小空闲存活时间
+        max-evictable-idle-time-millis: 1800000 # 最大空闲存活时间
+        validation-query: SELECT 1 FROM DUAL
+        test-while-idle: true
+        test-on-borrow: false
+        test-on-return: false
+        pool-prepared-statements: true # 启用 PreparedStatement 缓存
+        max-pool-prepared-statement-per-connection-size: 20 # 每连接最大缓存数
+
+      datasource:
+        master:
+          url: jdbc:mysql://127.0.0.1:3306/realm?useUnicode=true&characterEncoding=utf8&sslMode=DISABLED&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          username: root
+          password: root
+        slave:
+          lazy: true # 懒加载，加快启动
+          url: jdbc:mysql://127.0.0.1:3306/realm?useUnicode=true&characterEncoding=utf8&sslMode=DISABLED&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          username: root
+          password: root
+
+  # ---- Redis ----
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      database: 1
+      # password: 123456 # 生产建议开启
+
+  # ---- RabbitMQ ----
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: guest
+    password: guest
+
+  # ---- Kafka ----
+  kafka:
+    bootstrap-servers: 127.0.0.1:9092 # 多个用逗号分隔
+
+  # ---- Spring Boot Admin ----
+  boot:
+    admin:
+      client:
+        url: http://127.0.0.1:${server.port}/admin
+        instance:
+          service-host-type: IP # 注册实例优先使用 IP
+        username: admin
+        password: admin
+      context-path: /admin # Admin Server 上下文路径
+
+# ===== 定时任务 =====
+xxl:
+  job:
+    enabled: false # 是否开启调度中心
+    admin:
+      addresses: http://127.0.0.1:9090/xxl-job-admin # 调度中心地址
+
+# ===== 消息队列 =====
+rocketmq:
+  name-server: 127.0.0.1:9876 # Namesrv 地址
+
+# ===== 服务保障 =====
+lock4j:
+  acquire-timeout: 3000 # 获取分布式锁超时（毫秒）
+  expire: 30000 # 锁超时（毫秒）
+
+# ===== 监控 =====
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: '*' # 开放所有端点
+
+# ===== 日志 =====
+logging:
+  file:
+    name: ${user.home}/logs/${spring.application.name}.log
+
+# ===== 微信公众号 / 小程序 =====
+wx:
+  mp: # 公众号
+    app-id: ${WX_MP_APP_ID:wx-xxxx}
+    secret: ${WX_MP_SECRET:xxxx}
+    config-storage:
+      type: RedisTemplate # 跨节点共享 AccessToken
+      key-prefix: wx
+      http-client-type: HttpClient
+  miniapp: # 小程序
+    appid: ${WX_MINIAPP_APPID:wx-xxxx}
+    secret: ${WX_MINIAPP_SECRET:xxxx}
+    config-storage:
+      type: RedisTemplate
+      key-prefix: wa
+      http-client-type: HttpClient
+
+# ===== Realm 自定义 =====
+realm:
+  pay:
+    order-notify-url: http://127.0.0.1:48080/admin-api/pay/notify/order # 支付回调
+    refund-notify-url: http://127.0.0.1:48080/admin-api/pay/notify/refund # 退款回调
+    transfer-notify-url: http://127.0.0.1:48080/admin-api/pay/notify/transfer # 转账回调
+  demo: false # 演示模式
+  tencent-lbs-key: ${TENCENT_LBS_KEY:xxxx} # 腾讯地图 LBS 密钥
+
+# ===== 社交登录 =====
+justauth:
+  enabled: true
+  type:
+    DINGTALK:
+      client-id: ${DINGTALK_CLIENT_ID:xxxx}
+      client-secret: ${DINGTALK_CLIENT_SECRET:xxxx}
+      ignore-check-redirect-uri: true # 跳过 redirect_uri 校验
+    WECHAT_ENTERPRISE:
+      client-id: ${WECHAT_ENTERPRISE_CLIENT_ID:xxxx}
+      client-secret: ${WECHAT_ENTERPRISE_CLIENT_SECRET:xxxx}
+      agent-id: ${WECHAT_ENTERPRISE_AGENT_ID:1000004}
+      ignore-check-redirect-uri: true
+    WECHAT_MINI_PROGRAM:
+      client-id: ${wx.miniapp.appid}
+      client-secret: ${wx.miniapp.secret}
+      ignore-check-redirect-uri: true
+      ignore-check-state: true # 小程序不使用 state
+    WECHAT_MP:
+      client-id: ${wx.mp.app-id}
+      client-secret: ${wx.mp.secret}
+      ignore-check-redirect-uri: true
+    ALIPAY:
+      client-id: ${ALIPAY_CLIENT_ID:xxxx}
+      client-secret: ${ALIPAY_CLIENT_SECRET:xxxx}
+      alipay-public-key: ${ALIPAY_PUBLIC_KEY:xxxx}
+      ignore-check-redirect-uri: true
+      ignore-check-state: true
+  cache:
+    type: REDIS
+    prefix: 'social_auth_state:'
+    timeout: 24h
+
+# ===== 插件框架 =====
+pf4j:
+  pluginsDir: ${user.home}/plugins

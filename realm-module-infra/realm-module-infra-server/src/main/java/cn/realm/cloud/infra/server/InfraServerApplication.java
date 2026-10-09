@@ -4,6 +4,8 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
+ * 基础设施模块启动类 / Infrastructure module bootstrap class.
+ *
  * @author QI Guang
  */
 @SpringBootApplication

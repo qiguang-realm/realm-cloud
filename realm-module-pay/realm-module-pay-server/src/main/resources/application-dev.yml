@@ -1,0 +1,121 @@
+---
+
+# ===== 注册中心 + 配置中心 =====
+spring:
+  cloud:
+    nacos:
+      server-addr: 127.0.0.1:8848
+      username:
+      password:
+      discovery:
+        namespace: dev
+        group: DEFAULT_GROUP
+        metadata:
+          version: 1.0.0 # 服务实例版本，用于灰度发布
+      config:
+        namespace: dev
+        group: DEFAULT_GROUP
+
+---
+
+# ===== 数据库 =====
+spring:
+  datasource:
+    druid:
+      web-stat-filter:
+        enabled: true
+      stat-view-servlet:
+        enabled: true
+        allow: # 留空允许所有
+        url-pattern: /druid/*
+        login-username:
+        login-password:
+      filter:
+        stat:
+          enabled: true
+          log-slow-sql: true # 记录慢 SQL
+          slow-sql-millis: 100 # 慢 SQL 阈值（毫秒）
+          merge-sql: true
+        wall:
+          config:
+            multi-statement-allow: true # 允许多语句
+
+    dynamic:
+      primary: master
+      druid:
+        initial-size: 5 # 初始连接数
+        min-idle: 10 # 最小空闲连接
+        max-active: 20 # 最大活跃连接
+        max-wait: 60000 # 获取连接超时（毫秒）
+        time-between-eviction-runs-millis: 60000 # 空闲连接检测间隔
+        min-evictable-idle-time-millis: 600000 # 最小空闲存活时间
+        max-evictable-idle-time-millis: 1800000 # 最大空闲存活时间
+        validation-query: SELECT 1 FROM DUAL
+        test-while-idle: true
+        test-on-borrow: false
+        test-on-return: false
+        pool-prepared-statements: true # 启用 PreparedStatement 缓存
+        max-pool-prepared-statement-per-connection-size: 20 # 每连接最大缓存数
+
+      datasource:
+        master:
+          url: jdbc:mysql://127.0.0.1:3306/realm?useUnicode=true&characterEncoding=utf8&sslMode=DISABLED&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          username: root
+          password: root
+        slave:
+          lazy: true # 懒加载，加快启动
+          url: jdbc:mysql://127.0.0.1:3306/realm?useUnicode=true&characterEncoding=utf8&sslMode=DISABLED&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          username: root
+          password: root
+
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      database: 1
+      # password: 123456 # 生产建议开启
+
+---
+
+# ===== 定时任务 =====
+xxl:
+  job:
+    enabled: false # 是否开启调度中心
+    admin:
+      addresses: http://127.0.0.1:9090/xxl-job-admin # 调度中心地址
+
+---
+
+# ===== 服务保障 =====
+lock4j:
+  acquire-timeout: 3000 # 获取分布式锁超时（毫秒）
+  expire: 30000 # 锁超时（毫秒）
+
+---
+
+# ===== 监控 =====
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: '*' # 开放所有端点
+
+spring:
+  boot:
+    admin:
+      client:
+        instance:
+          service-host-type: IP # 注册实例优先使用 IP
+        username: admin
+        password: admin
+
+---
+
+# ===== Realm 支付模块 =====
+realm:
+  pay:
+    order-notify-url: http://127.0.0.1:48085/admin-api/pay/notify/order # 支付回调
+    refund-notify-url: http://127.0.0.1:48085/admin-api/pay/notify/refund # 退款回调
+    transfer-notify-url: http://127.0.0.1:48085/admin-api/pay/notify/transfer # 转账回调
+  demo: true # 演示模式

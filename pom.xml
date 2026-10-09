@@ -28,6 +28,10 @@
         <module>realm-module-infra</module>
         <module>realm-module-system</module>
         <module>realm-server</module>
+        <module>realm-module-report</module>
+        <module>realm-module-member</module>
+        <module>realm-module-ai</module>
+        <module>realm-module-pay</module>
     </modules>
 
     <!-- 属性（版本单一来源） / Properties (single source of truth for versions) -->
@@ -116,6 +120,12 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>${maven-surefire-plugin.version}</version>
+                </plugin>
+                <!-- Spring Boot 打包插件（统一版本，子模块无需再写 version） / Spring Boot Maven Plugin (unified version, submodules omit version) -->
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>

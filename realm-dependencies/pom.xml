@@ -27,8 +27,9 @@
 
         <!-- Spring 生态（属性名遵循 Spring 官方约定：spring-boot.version、spring-cloud.version） / Spring ecosystem (property names follow Spring official convention) -->
         <spring-boot.version>3.5.15</spring-boot.version>
-        <spring-cloud.version>2025.0.0</spring-cloud.version>
-        <spring-cloud-alibaba.version>2023.0.3.3</spring-cloud-alibaba.version>
+        <spring-cloud.version>2025.0.1</spring-cloud.version>
+        <spring-cloud-alibaba.version>2025.0.0.0</spring-cloud-alibaba.version>
+        <spring-ai.version>1.1.8</spring-ai.version>
 
         <!-- Web 开发 / Web development -->
         <!-- SpringDoc OpenAPI -->
@@ -48,7 +49,7 @@
         <!-- 动态数据源 / Dynamic datasource -->
         <dynamic-datasource.version>4.3.1</dynamic-datasource.version>
         <!-- 数据翻译 / Data translation (Easy-Trans) -->
-        <easy-trans.version>3.0.6</easy-trans.version>
+        <easy-trans.version>3.1.8</easy-trans.version>
         <!-- Redisson 分布式锁/缓存 / Distributed lock & cache -->
         <redisson.version>3.51.0</redisson.version>
         <!-- 达梦数据库驱动 / Dameng DB driver -->
@@ -77,8 +78,12 @@
         <spring-boot-admin.version>3.5.2</spring-boot-admin.version>
         <!-- OpenTracing API -->
         <opentracing.version>0.33.0</opentracing.version>
+        <!-- OpenTelemetry -->
+        <opentelemetry.version>1.65.0</opentelemetry.version>
 
         <!-- 测试 / Testing -->
+        <!-- H2 内存数据库 / H2 in-memory database -->
+        <h2.version>2.3.232</h2.version>
         <!-- 随机 POJO 生成 / Random POJO generator -->
         <podam.version>8.0.2.RELEASE</podam.version>
         <!-- Jedis Mock（Redis 模拟） / Redis mock -->
@@ -107,10 +112,12 @@
         <hutool-6.version>6.0.0-M22</hutool-6.version>
         <!-- FastExcel（EasyExcel 替代） / FastExcel (EasyExcel alternative) -->
         <fastexcel.version>1.3.0</fastexcel.version>
+        <!-- Aviator 公式引擎 / Aviator expression engine -->
+        <aviator.version>5.4.4</aviator.version>
         <!-- Velocity 模板引擎 / Template engine -->
         <velocity.version>2.4.1</velocity.version>
-        <!-- Fastjson 1.x（兼容） / Fastjson 1.x (compatibility) -->
-        <fastjson.version>1.2.83</fastjson.version>
+        <!-- Fastjson 2.x（含 1.x 兼容） / Fastjson 2.x (with 1.x compatibility) -->
+        <fastjson2.version>2.0.65</fastjson2.version>
         <!-- Google Guava -->
         <guava.version>33.4.8-jre</guava.version>
         <!-- 线程上下文传递 / Thread context propagation -->
@@ -118,7 +125,7 @@
         <!-- Apache Commons Net（FTP 等） / FTP etc. -->
         <commons-net.version>3.11.1</commons-net.version>
         <!-- Apache Commons Lang3 -->
-        <commons-lang3.version>3.18.0</commons-lang3.version>
+        <commons-lang3.version>3.20.0</commons-lang3.version>
         <!-- JSch SFTP 客户端 / SFTP client -->
         <jsch.version>2.27.3</jsch.version>
         <!-- Apache Tika（文件类型识别） / File type detection -->
@@ -161,9 +168,9 @@
         <!-- JustAuth Spring Boot Starter -->
         <justauth-starter.version>1.4.0</justauth-starter.version>
         <!-- 积木报表 / JimuReport -->
-        <jimureport.version>2.1.1</jimureport.version>
+        <jimureport.version>2.5.4</jimureport.version>
         <!-- 积木 BI / JimuBI -->
-        <jimubi.version>2.1.0</jimubi.version>
+        <jimubi.version>2.5.4</jimubi.version>
         <!-- 微信 Java SDK / WeChat Java SDK -->
         <weixin-java.version>4.7.7-20250808.182223</weixin-java.version>
 
@@ -207,6 +214,21 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- Spring AI BOM：统一管理 spring-ai-starter-* 系列依赖 -->
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-bom</artifactId>
+                <version>${opentelemetry.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
 
             <!-- 业务功能组件（Realm 框架自定义） / Business components (Realm custom) -->
             <dependency>
@@ -237,6 +259,11 @@
             </dependency>
 
             <!-- Spring 核心增强 / Spring core enhancements -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-configuration-processor</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
             <dependency>
                 <groupId>cn.realm.cloud</groupId>
                 <artifactId>realm-spring-boot-starter-env</artifactId>
@@ -325,7 +352,7 @@
             </dependency>
             <!-- Easy-Trans 数据翻译 / Data translation -->
             <dependency>
-                <groupId>com.fhs-opensource</groupId>
+                <groupId>org.dromara</groupId>
                 <artifactId>easy-trans-spring-boot-starter</artifactId>
                 <version>${easy-trans.version}</version>
                 <exclusions>
@@ -337,17 +364,27 @@
                         <groupId>org.springframework.cloud</groupId>
                         <artifactId>spring-cloud-commons</artifactId>
                     </exclusion>
+                    <exclusion>
+                        <groupId>com.alibaba</groupId>
+                        <artifactId>fastjson</artifactId>
+                    </exclusion>
                 </exclusions>
             </dependency>
             <dependency>
-                <groupId>com.fhs-opensource</groupId>
+                <groupId>org.dromara</groupId>
                 <artifactId>easy-trans-mybatis-plus-extend</artifactId>
                 <version>${easy-trans.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.fhs-opensource</groupId>
+                <groupId>org.dromara</groupId>
                 <artifactId>easy-trans-anno</artifactId>
                 <version>${easy-trans.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>com.alibaba</groupId>
+                        <artifactId>fastjson</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <!-- 缓存与分布式锁 / Cache & distributed lock -->
@@ -356,17 +393,14 @@
                 <artifactId>realm-spring-boot-starter-redis</artifactId>
                 <version>${revision}</version>
             </dependency>
-            <!-- Redisson（排除不兼容的 spring-data-41，改用 spring-data-35） / Redisson (exclude spring-data-41, use spring-data-35) -->
+            <!--
+                Redisson：3.51.0 默认捆绑 redisson-spring-data-35，与 Spring Boot 3.5.x 兼容。
+                升级到 Redisson 4.x 时，必须改为排除 redisson-spring-data-41 并显式引入 redisson-spring-data-35。
+            -->
             <dependency>
                 <groupId>org.redisson</groupId>
                 <artifactId>redisson-spring-boot-starter</artifactId>
                 <version>${redisson.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>org.redisson</groupId>
-                        <artifactId>redisson-spring-data-41</artifactId>
-                    </exclusion>
-                </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.redisson</groupId>
@@ -411,6 +445,12 @@
                 <groupId>org.apache.rocketmq</groupId>
                 <artifactId>rocketmq-spring-boot-starter</artifactId>
                 <version>${rocketmq-spring.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>com.alibaba</groupId>
+                        <artifactId>fastjson</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <!-- 分布式任务调度 / Distributed job scheduling -->
@@ -527,6 +567,11 @@
                 </exclusions>
             </dependency>
             <dependency>
+                <groupId>com.h2database</groupId>
+                <artifactId>h2</artifactId>
+                <version>${h2.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>com.github.fppt</groupId>
                 <artifactId>jedis-mock</artifactId>
                 <version>${jedis-mock.version}</version>
@@ -601,6 +646,12 @@
                 <artifactId>fastexcel</artifactId>
                 <version>${fastexcel.version}</version>
             </dependency>
+            <!-- Aviator 公式引擎 / Aviator expression engine -->
+            <dependency>
+                <groupId>com.googlecode.aviator</groupId>
+                <artifactId>aviator</artifactId>
+                <version>${aviator.version}</version>
+            </dependency>
             <!-- Apache PDFBox -->
             <dependency>
                 <groupId>org.apache.pdfbox</groupId>
@@ -625,11 +676,16 @@
                 <artifactId>velocity-engine-core</artifactId>
                 <version>${velocity.version}</version>
             </dependency>
-            <!-- Fastjson -->
+            <!-- Fastjson2（含 fastjson 1.x 兼容实现） / Fastjson2 (with fastjson 1.x compatibility) -->
+            <dependency>
+                <groupId>com.alibaba.fastjson2</groupId>
+                <artifactId>fastjson2</artifactId>
+                <version>${fastjson2.version}</version>
+            </dependency>
             <dependency>
                 <groupId>com.alibaba</groupId>
                 <artifactId>fastjson</artifactId>
-                <version>${fastjson.version}</version>
+                <version>${fastjson2.version}</version>
             </dependency>
             <!-- Guava -->
             <dependency>
@@ -648,6 +704,12 @@
                 <groupId>commons-net</groupId>
                 <artifactId>commons-net</artifactId>
                 <version>${commons-net.version}</version>
+            </dependency>
+            <!-- commons-lang3 -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>${commons-lang3.version}</version>
             </dependency>
             <!-- JSch -->
             <dependency>
@@ -751,18 +813,40 @@
                 <groupId>me.zhyd.oauth</groupId>
                 <artifactId>JustAuth</artifactId>
                 <version>${justauth.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>com.alibaba</groupId>
+                        <artifactId>fastjson</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>com.xkcoding.justauth</groupId>
                 <artifactId>justauth-spring-boot-starter</artifactId>
                 <version>${justauth-starter.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>cn.hutool</groupId>
+                        <artifactId>hutool-core</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <!-- 积木报表 / JimuReport -->
             <dependency>
                 <groupId>org.jeecgframework.jimureport</groupId>
-                <artifactId>jimureport-spring-boot3-starter-fastjson2</artifactId>
+                <artifactId>jimureport-spring-boot3-starter</artifactId>
                 <version>${jimureport.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>io.swagger.core.v3</groupId>
+                        <artifactId>swagger-annotations-jakarta</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.alibaba</groupId>
+                        <artifactId>fastjson</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.jeecgframework.jimureport</groupId>
@@ -776,6 +860,10 @@
                     <exclusion>
                         <groupId>cn.hutool</groupId>
                         <artifactId>hutool-core</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.alibaba</groupId>
+                        <artifactId>fastjson</artifactId>
                     </exclusion>
                 </exclusions>
             </dependency>

@@ -1,0 +1,251 @@
+
+Java 日志规约——全球顶级企业实践与国际标准融合规范
+
+========================================================================================================================
+推荐使用 SLF4J
+
+使用 SLF4J：
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+private static final Logger logger = LoggerFactory.getLogger(Test.class);
+
+
+5.【强制】在日志输出时，字符串变量之间的拼接使用占位符的方式。
+
+正例：logger.debug("Processing trade with id : {} and symbol : {}", id, symbol);
+
+6.【强制】对于 trace / debug / info 级别的日志输出，必须进行日志级别的开关判断：
+
+正例：
+// 如果判断为真，那么可以输出 trace 和 debug 级别的日志
+if (logger.isDebugEnabled()) {
+logger.debug("Current ID is: {} and name is: {}", id, getName());
+}
+
+
+9.【强制】异常信息应该包括两类信息：案发现场信息和异常堆栈信息。如果不处理，那么通过关键字
+throws 往上抛出。
+正例：logger.error("inputParams: {} and errorMessage: {}", 各类参数或者对象 toString(), e.getMessage(), e);
+
+10.【强制】日志打印时禁止直接用 JSON 工具将对象转换成 String。
+
+正例：打印日志时仅打印出业务相关属性值或者调用其对象的 toString() 方法。
+
+========================================================================================================================
+2. 业务请求日志：开始 / 成功 / 失败 / 耗时
+
+private static final Logger log = LoggerFactory.getLogger(BizService.class);
+
+public Result doBiz(String traceId, String bizType, String bizId, Long userId, BizParam param) {
+    if (log.isInfoEnabled()) {
+        log.info("biz request start traceId={} bizType={} bizId={} userId={} params={}",
+                traceId, bizType, bizId, userId, param == null ? null : param.toString());
+    }
+
+    long start = System.currentTimeMillis();
+    try {
+        Result result = doSomething(param);
+        long cost = System.currentTimeMillis() - start;
+
+        if (log.isInfoEnabled()) {
+            log.info("biz request success traceId={} bizType={} bizId={} userId={} resultCode={} costMs={}",
+                    traceId, bizType, bizId, userId, result.getCode(), cost);
+        }
+        return result;
+    } catch (Exception e) {
+        long cost = System.currentTimeMillis() - start;
+        log.error("biz request failed traceId={} bizType={} bizId={} userId={} costMs={} error={}",
+                traceId, bizType, bizId, userId, cost, e.getMessage(), e);
+        throw e;
+    }
+}
+========================================================================================================================
+Web 接口日志：开始 / 成功 / 失败 / 耗时
+建议放在 Filter、Interceptor 或 Controller AOP 中。
+params 必须脱敏，不能直接打印完整请求体，也不能用 JSON 工具转 String。
+
+if (log.isInfoEnabled()) {
+    log.info("web request start traceId={} method={} uri={} clientIp={} userId={} params={}",
+            traceId, request.getMethod(), request.getRequestURI(),
+            clientIp, userId, buildSafeParams(request));
+}
+
+long start = System.currentTimeMillis();
+try {
+    Object result = proceed();
+
+    long cost = System.currentTimeMillis() - start;
+    if (log.isInfoEnabled()) {
+        log.info("web request success traceId={} method={} uri={} userId={} status={} costMs={}",
+                traceId, method, uri, userId, status, cost);
+    }
+    return result;
+} catch (Exception e) {
+    long cost = System.currentTimeMillis() - start;
+    log.error("web request failed traceId={} method={} uri={} userId={} clientIp={} costMs={} error={}",
+            traceId, method, uri, userId, clientIp, cost, e.getMessage(), e);
+    throw e;
+}
+
+buildSafeParams 示例思路：
+
+private String buildSafeParams(HttpServletRequest request) {
+    // 只取业务关键字段，并脱敏；禁止 JSON.toJSONString(request)
+    return "orderId=" + request.getParameter("orderId")
+            + ", mobile=" + desensitizeMobile(request.getParameter("mobile"));
+}
+========================================================================================================================
+
+3. 定时任务日志：开始 / 成功 / 失败 / 耗时
+
+String taskName = "auto-approve-enterprise-task";
+log.info("task start taskName={}", taskName);
+long start = System.currentTimeMillis();
+
+try {
+    int processed = doTask();
+    long cost = System.currentTimeMillis() - start;
+    log.info("task success taskName={} processedCount={} costMs={}",
+            taskName, processed, cost);
+} catch (Exception e) {
+    long cost = System.currentTimeMillis() - start;
+    log.error("task failed taskName={} costMs={}", taskName, cost, e);
+}
+
+========================================================================================================================
+4. 异常日志：必须带堆栈
+
+// 消息 + 异常对象 e，SLF4J 会输出完整堆栈
+log.error("create order failed orderId={} userId={} error={}",
+        orderId, userId, e.getMessage(), e);
+========================================================================================================================
+
+logger.debug("处理交易|processing trade id={} symbol={}", id, symbol);
+
+if (logger.isDebugEnabled()) {
+    logger.debug("当前ID和名称|current id={} name={}", id, getName());
+}
+
+logger.error("输入参数和错误信息|input params={} errorMessage={}",
+        params.toString(), e.getMessage(), e);
+
+logger.info("订单信息|order info orderId={} status={}", order.getId(), order.getStatus());
+
+
+private static final Logger log = LoggerFactory.getLogger(BizService.class);
+
+public Result doBiz(String traceId, String bizType, String bizId, Long userId, BizParam param) {
+    // 业务请求开始
+    if (log.isInfoEnabled()) {
+        log.info("业务请求开始|biz request start traceId={} bizType={} bizId={} userId={} params={}",
+                traceId, bizType, bizId, userId, param == null ? null : param.toString());
+    }
+
+    long start = System.currentTimeMillis();
+    try {
+        Result result = doSomething(param);
+        long cost = System.currentTimeMillis() - start;
+
+        // 业务请求成功
+        if (log.isInfoEnabled()) {
+            log.info("业务请求成功|biz request success traceId={} bizType={} bizId={} userId={} resultCode={} costMs={}",
+                    traceId, bizType, bizId, userId, result.getCode(), cost);
+        }
+        return result;
+    } catch (Exception e) {
+        long cost = System.currentTimeMillis() - start;
+
+        // 业务请求失败：必须带 e 输出堆栈
+        log.error("业务请求失败|biz request failed traceId={} bizType={} bizId={} userId={} costMs={} error={}",
+                traceId, bizType, bizId, userId, cost, e.getMessage(), e);
+        throw e;
+    }
+}
+
+
+private static final Logger log = LoggerFactory.getLogger(XxxService.class);
+private static final String METHOD = "doBiz";
+
+public Result doBiz(String traceId, String bizType, String bizId, Long userId, BizParam param) {
+    if (log.isInfoEnabled()) {
+        log.info("业务请求开始 method={} traceId={} bizType={} bizId={} userId={} params={}",
+                METHOD, traceId, bizType, bizId, userId, param == null ? null : param.toString());
+    }
+
+    long start = System.currentTimeMillis();
+    try {
+        Result result = doSomething(param);
+        long cost = System.currentTimeMillis() - start;
+
+        if (log.isInfoEnabled()) {
+            log.info("业务请求成功 method={} traceId={} bizType={} bizId={} userId={} resultCode={} costMs={}",
+                    METHOD, traceId, bizType, bizId, userId, result.getCode(), cost);
+        }
+        return result;
+    } catch (Exception e) {
+        long cost = System.currentTimeMillis() - start;
+        log.error("业务请求失败 method={} traceId={} bizType={} bizId={} userId={} costMs={} error={}",
+                METHOD, traceId, bizType, bizId, userId, cost, e.getMessage(), e);
+        throw e;
+    }
+}
+
+// Web 请求开始
+if (log.isInfoEnabled()) {
+    log.info("Web请求开始|web request start traceId={} method={} uri={} clientIp={} userId={} params={}",
+            traceId, request.getMethod(), request.getRequestURI(),
+            clientIp, userId, buildSafeParams(request));
+}
+
+long start = System.currentTimeMillis();
+try {
+    Object result = proceed();
+    long cost = System.currentTimeMillis() - start;
+
+    // Web 请求成功
+    if (log.isInfoEnabled()) {
+        log.info("Web请求成功|web request success traceId={} method={} uri={} userId={} status={} costMs={}",
+                traceId, method, uri, userId, status, cost);
+    }
+    return result;
+} catch (Exception e) {
+    long cost = System.currentTimeMillis() - start;
+
+    // Web 请求失败：必须带 e 输出堆栈
+    log.error("Web请求失败|web request failed traceId={} method={} uri={} userId={} clientIp={} costMs={} error={}",
+            traceId, method, uri, userId, clientIp, cost, e.getMessage(), e);
+    throw e;
+}
+
+
+String taskName = "auto-approve-enterprise-task";
+
+// 定时任务开始
+log.info("定时任务开始|task start taskName={}", taskName);
+long start = System.currentTimeMillis();
+
+try {
+    int processed = doTask();
+    long cost = System.currentTimeMillis() - start;
+
+    // 定时任务成功
+    log.info("定时任务成功|task success taskName={} processedCount={} costMs={}",
+            taskName, processed, cost);
+} catch (Exception e) {
+    long cost = System.currentTimeMillis() - start;
+
+    // 定时任务失败：必须带 e 输出堆栈
+    log.error("定时任务失败|task failed taskName={} costMs={} error={}",
+            taskName, cost, e.getMessage(), e);
+}
+
+log.error("创建订单失败|create order failed orderId={} userId={} error={}",
+        orderId, userId, e.getMessage(), e);
+========================================================================================================================
+注意事项
+1.异常必须带 e
+2.禁止 JSON.toJSONString(obj) 打日志
+6.避免循环内大量打日志
+========================================================================================================================
+在日志规约中，除了参数校验失败，还有哪些常见场景？
+参数校验失败怎么打日志。

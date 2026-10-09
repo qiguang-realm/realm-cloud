@@ -1,0 +1,174 @@
+# ============================================================
+# Spring Boot 应用核心配置（gateway-server）
+# ============================================================
+
+spring:
+  # ---- 应用基础 ----
+  application:
+    name: gateway-server
+
+  profiles:
+    active: local # 环境：local / dev / test / prod
+
+  # ---- HTTP 编解码 ----
+  http:
+    codecs:
+      max-in-memory-size: 10MB # 内存缓冲区上限
+
+  # ---- Jackson 序列化 ----
+  jackson:
+    serialization:
+      write-dates-as-timestamps: true # LocalDateTime 用时间戳
+      write-date-timestamps-as-nanoseconds: false # 禁用纳秒时间戳
+      write-durations-as-timestamps: true # Duration 用时间戳
+      fail-on-empty-beans: false # 允许序列化无属性 Bean
+
+  main:
+    allow-circular-references: true # 三层架构需要
+
+  # ---- 配置导入 ----
+  config:
+    import:
+      - optional:classpath:application-${spring.profiles.active}.yml # 本地配置
+      - optional:nacos:${spring.application.name}-${spring.profiles.active}.yml # Nacos 配置
+
+  # ---- Spring Cloud Gateway ----
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+
+            # ---------- system-server ----------
+            - id: system-admin-api
+              uri: lb://system-server
+              predicates:
+                - Path=/admin-api/system/**
+              filters:
+                - RewritePath=/admin-api/system/v3/api-docs, /v3/api-docs
+            - id: system-app-api
+              uri: lb://system-server
+              predicates:
+                - Path=/app-api/system/**
+              filters:
+                - RewritePath=/app-api/system/v3/api-docs, /v3/api-docs
+
+            # ---------- infra-server ----------
+            - id: infra-admin-api
+              uri: lb://infra-server
+              predicates:
+                - Path=/admin-api/infra/**
+              filters:
+                - RewritePath=/admin-api/infra/v3/api-docs, /v3/api-docs
+            - id: infra-app-api
+              uri: lb://infra-server
+              predicates:
+                - Path=/app-api/infra/**
+              filters:
+                - RewritePath=/admin-api/infra/v3/api-docs, /v3/api-docs
+            - id: infra-spring-boot-admin
+              uri: lb://infra-server
+              predicates:
+                - Path=/admin/**
+            - id: infra-websocket
+              uri: lb://infra-server
+              predicates:
+                - Path=/infra/ws/**
+
+            # ---------- member-server ----------
+            - id: member-admin-api
+              uri: lb://member-server
+              predicates:
+                - Path=/admin-api/member/**
+              filters:
+                - RewritePath=/admin-api/member/v3/api-docs, /v3/api-docs
+            - id: member-app-api
+              uri: lb://member-server
+              predicates:
+                - Path=/app-api/member/**
+              filters:
+                - RewritePath=/app-api/member/v3/api-docs, /v3/api-docs
+
+            # ---------- report-server ----------
+            - id: report-admin-api
+              uri: lb://report-server
+              predicates:
+                - Path=/admin-api/report/**
+              filters:
+                - RewritePath=/admin-api/report/v3/api-docs, /v3/api-docs
+            - id: report-jimu
+              uri: lb://report-server
+              predicates:
+                - Path=/jmreport/**, /drag/**, /jimubi/** # 积木报表
+
+            # ---------- pay-server ----------
+            - id: pay-admin-api
+              uri: lb://pay-server
+              predicates:
+                - Path=/admin-api/pay/**
+              filters:
+                - RewritePath=/admin-api/pay/v3/api-docs, /v3/api-docs
+            - id: pay-app-api
+              uri: lb://pay-server
+              predicates:
+                - Path=/app-api/pay/**
+              filters:
+                - RewritePath=/app-api/pay/v3/api-docs, /v3/api-docs
+
+            # ---------- ai-server ----------
+            - id: ai-admin-api
+              uri: lb://ai-server
+              predicates:
+                - Path=/admin-api/ai/**
+              filters:
+                - RewritePath=/admin-api/ai/v3/api-docs, /v3/api-docs
+            - id: ai-mcp-server
+              uri: lb://ai-server
+              predicates:
+                - Path=/sse, /mcp/message # MCP Server
+
+          # 转发头
+          x-forwarded:
+            prefix-enabled: false # 避免 Swagger 重复带 /admin-api/system 前缀
+
+          # 默认过滤器
+          default-filters:
+            - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin # 去重 CORS 响应头
+
+# ===== Web 服务器 =====
+server:
+  port: 48080
+
+# ===== 日志 =====
+logging:
+  file:
+    name: ${user.home}/logs/${spring.application.name}.log
+
+# ===== 接口文档聚合（Knife4j Gateway） =====
+knife4j:
+  gateway:
+    enabled: true
+    routes:
+      - name: system-server
+        service-name: system-server
+        url: /admin-api/system/v3/api-docs
+      - name: infra-server
+        service-name: infra-server
+        url: /admin-api/infra/v3/api-docs
+      - name: member-server
+        service-name: member-server
+        url: /admin-api/member/v3/api-docs
+      - name: report-server
+        service-name: report-server
+        url: /admin-api/report/v3/api-docs
+      - name: pay-server
+        service-name: pay-server
+        url: /admin-api/pay/v3/api-docs
+      - name: ai-server
+        service-name: ai-server
+        url: /admin-api/ai/v3/api-docs
+
+# ===== Realm 自定义 =====
+realm:
+  info:
+    version: 1.0.0

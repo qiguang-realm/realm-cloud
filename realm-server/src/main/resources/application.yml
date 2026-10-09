@@ -1,0 +1,349 @@
+# ============================================================
+# Realm Server 一体化配置
+# 聚合：system / infra / member / report / pay / ai
+# ============================================================
+
+spring:
+  # ---- 应用基础 ----
+  application:
+    name: realm-server
+
+  profiles:
+    active: local # 环境：local / dev / test / prod
+
+  main:
+    allow-circular-references: true # 三层架构需要
+    # allow-bean-definition-overriding: false # 需要时开启，解决 Feign 重复定义
+
+  # ---- 文件上传 ----
+  servlet:
+    multipart:
+      max-file-size: 16MB # 单文件上限
+      max-request-size: 32MB # 请求总上限
+
+  # ---- Jackson 序列化 ----
+  jackson:
+    serialization:
+      write-dates-as-timestamps: true # 时间类型用时间戳
+      write-date-timestamps-as-nanoseconds: false # 禁用纳秒时间戳
+      write-durations-as-timestamps: true # Duration 用时间戳
+      fail-on-empty-beans: false # 允许序列化无属性 Bean
+
+  # ---- Redis 缓存 ----
+  cache:
+    type: REDIS
+    redis:
+      time-to-live: 1h # 缓存 TTL
+
+  data:
+    redis:
+      repositories:
+        enabled: false # 未用 Repository，关闭以加快启动
+
+  # ---- Kafka ----
+  kafka:
+    producer:
+      acks: 1 # 可选：0 / 1 / all
+      retries: 3
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      auto-offset-reset: earliest # 消费偏移重置策略
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: '*'
+    listener:
+      missing-topics-fatal: false # 主题不存在不报错
+
+  # ---- Nacos：一体化启动关闭 ----
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+
+  # ---- Spring AI ----
+  ai:
+    # 向量存储
+    vectorstore:
+      redis:
+        initialize-schema: true
+        index-name: knowledge_index # 向量索引名称
+        prefix: "knowledge_segment:" # 键名前缀
+      qdrant:
+        initialize-schema: true
+        collection-name: knowledge_segment
+        host: 127.0.0.1
+        port: 6334
+      milvus:
+        initialize-schema: true
+        database-name: default
+        collection-name: knowledge_segment
+        client:
+          host: 127.0.0.1
+          port: 19530
+
+    # 模型平台
+    openai:
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      api-key: ${OPENAI_API_KEY:sk-xxxx} # 生产替换
+    azure:
+      openai:
+        endpoint: ${AZURE_OPENAI_ENDPOINT:https://your-resource.openai.azure.com}
+    anthropic:
+      base-url: ${ANTHROPIC_BASE_URL:https://api.anthropic.com}
+      api-key: ${ANTHROPIC_API_KEY:sk-xxxx} # 生产替换
+    ollama:
+      base-url: http://127.0.0.1:11434
+      chat:
+        model: llama3
+    stabilityai:
+      api-key: ${STABILITYAI_API_KEY:sk-xxxx} # 生产替换
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:sk-xxxx} # 生产替换
+    deepseek:
+      api-key: ${DEEPSEEK_API_KEY:sk-xxxx} # 生产替换
+      chat:
+        options:
+          model: deepseek-v4-flash
+    model:
+      rerank: false # 是否开启通义千问 Rerank
+
+    # MCP
+    mcp:
+      server:
+        enabled: false
+        name: realm-mcp-server
+        version: 1.0.0
+        instructions: 一个 MCP 示例服务 / A sample MCP service
+        sse-endpoint: /sse
+      client:
+        enabled: false
+        name: mcp
+        sse:
+          connections:
+            filesystem:
+              url: http://127.0.0.1:8089
+              sse-endpoint: /sse
+        annotation-scanner:
+          enabled: false # 官方 bug 修复前禁用
+
+# ===== Web 服务器 =====
+server:
+  port: 48080
+  servlet:
+    encoding:
+      enabled: true
+      charset: UTF-8
+      force: true # 避免 AI 流式返回乱码
+
+# ===== 接口文档 =====
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui
+  default-flat-param-object: true # 参见 Knife4j 文档
+
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn # 界面语言
+
+# ===== MyBatis-Plus =====
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true # 下划线转驼峰
+  global-config:
+    db-config:
+      id-type: NONE # 智能模式，自动适配 AUTO/INPUT
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+    banner: false
+  type-aliases-package: ${realm.info.base-package}.*.dal.dataobject # 各模块 dal.dataobject
+  encryptor:
+    password: XDV71a+xqStEA3WH # AES 加密密钥，可在线生成
+
+mybatis-plus-join:
+  banner: false
+  sub-table-logic: true # 全局启用副表逻辑删除
+  ms-cache: true # 拦截器 MappedStatement 缓存
+  table-alias: t
+  logic-del-type: on # 副表逻辑删除条件位置：WHERE / ON
+
+# ===== 数据翻译 =====
+easy-trans:
+  is-enable-global: false # 关闭全局翻译，性能考虑
+
+# ===== 定时任务 =====
+xxl:
+  job:
+    executor:
+      appname: ${spring.application.name}
+      logpath: ${user.home}/logs/xxl-job/${spring.application.name}
+    accessToken: default_token # 通讯 Token
+
+# ===== 验证码 =====
+aj:
+  captcha:
+    jigsaw: classpath:images/jigsaw # 滑动验证底图
+    pic-click: classpath:images/pic-click # 点选验证底图
+    cache-type: redis # 可选：local / redis
+    cache-number: 1000 # local 缓存阈值
+    timing-clear: 180 # local 过期缓存清理间隔（秒）
+    type: blockPuzzle # 可选：blockPuzzle / clickWord / pictureWord
+    water-mark: realm
+    interference-options: 0 # 可选：0 / 1 / 2
+    req-frequency-limit-enable: false # 接口请求频率限制
+    req-get-lock-limit: 5
+    req-get-lock-seconds: 10
+    req-get-minute-limit: 30
+    req-check-minute-limit: 60
+    req-verify-minute-limit: 60
+
+# ===== 消息队列 =====
+rocketmq:
+  producer:
+    group: ${spring.application.name}_PRODUCER
+
+# ===== Realm 自定义配置 =====
+realm:
+  info:
+    version: 1.0.0
+    base-package: cn.realm.cloud
+
+  web:
+    admin-ui:
+      url: http://dashboard.realm.cn
+
+  xss:
+    enable: false
+    exclude-urls:
+      - ${spring.boot.admin.context-path}/** # Spring Boot Admin 端点
+      - ${management.endpoints.web.base-path}/** # Actuator 端点
+
+  security:
+    permit-all-urls:
+      - /admin-api/mp/open/** # 微信公众号开放平台回调，无需登录
+
+  websocket:
+    enable: true
+    path: /infra/ws
+    sender-type: local # 可选：local / redis / rocketmq / kafka / rabbitmq
+    sender-rocketmq:
+      topic: ${spring.application.name}-websocket
+      consumer-group: ${spring.application.name}-websocket-consumer
+    sender-rabbitmq:
+      exchange: ${spring.application.name}-websocket-exchange
+      queue: ${spring.application.name}-websocket-queue
+    sender-kafka:
+      topic: ${spring.application.name}-websocket
+      consumer-group: ${spring.application.name}-websocket-consumer
+
+  swagger:
+    title: Realm 快速开发平台
+    description: 提供管理后台、用户 App 的所有功能
+    version: ${realm.info.version}
+    url: ${realm.web.admin-ui.url}
+    email: ${REALM_CONTACT_EMAIL:your-email@example.com}
+    license: MIT
+    license-url: ${REALM_LICENSE_URL:https://github.com/your-org/realm/blob/master/LICENSE}
+
+  codegen:
+    base-package: ${realm.info.base-package}
+    db-schemas: ${spring.datasource.dynamic.datasource.master.name}
+    front-type: 20 # 前端模板类型，见 CodegenFrontTypeEnum
+    vo-type: 10 # VO 类型，见 CodegenVOTypeEnum
+    delete-batch-enable: true
+    unit-test-enable: false
+    import-enable: false
+
+  tenant:
+    enable: true
+    ignore-urls:
+      - /jmreport/* # 积木报表无法携带租户编号
+    ignore-visit-urls:
+      - /admin-api/system/user/profile/**
+      - /admin-api/system/auth/**
+    ignore-tables:
+    ignore-caches:
+      - user_role_ids
+      - permission_menu_ids
+      - oauth_client
+      - notify_template
+      - mail_account
+      - mail_template
+      - sms_template
+
+  sms-code:
+    expire-times: 10m
+    send-frequency: 1m
+    send-maximum-quantity-per-day: 10
+    begin-code: 9999 # 本地测试用
+    end-code: 9999 # 本地测试用
+
+  ai:
+    gemini:
+      enable: ${GEMINI_ENABLE:false} # 本地建议关闭，避免无 Key 启动失败
+      api-key: ${GEMINI_API_KEY:sk-xxxx}
+      model: gemini-2.5-flash
+    doubao:
+      enable: ${DOUBAO_ENABLE:false}
+      api-key: ${DOUBAO_API_KEY:sk-xxxx}
+      model: doubao-seed-2-1-turbo-260628
+    hunyuan:
+      enable: ${HUNYUAN_ENABLE:false}
+      api-key: ${HUNYUAN_API_KEY:sk-xxxx}
+      model: hy3-preview
+    siliconflow:
+      enable: ${SILICONFLOW_ENABLE:false}
+      api-key: ${SILICONFLOW_API_KEY:sk-xxxx}
+      model: deepseek-ai/DeepSeek-V4-Pro
+    xinghuo:
+      enable: ${XINGHUO_ENABLE:false}
+      api-key: ${XINGHUO_API_KEY:sk-xxxx}
+      model: x2-flash
+    baichuan:
+      enable: ${BAICHUAN_ENABLE:false}
+      api-key: ${BAICHUAN_API_KEY:sk-xxxx}
+      model: Baichuan-M3
+    yiyan:
+      enable: ${YIYAN_ENABLE:false}
+      api-key: ${YIYAN_API_KEY:sk-xxxx}
+      model: ernie-5.1
+    zhipu:
+      enable: ${ZHIPU_ENABLE:false}
+      api-key: ${ZHIPU_API_KEY:sk-xxxx}
+      model: glm-5.2
+    minimax:
+      enable: ${MINIMAX_ENABLE:false}
+      api-key: ${MINIMAX_API_KEY:sk-xxxx}
+      model: MiniMax-M3
+    moonshot:
+      enable: ${MOONSHOT_ENABLE:false}
+      api-key: ${MOONSHOT_API_KEY:sk-xxxx}
+      model: kimi-k2.6
+    stepfun:
+      enable: ${STEPFUN_ENABLE:false}
+      api-key: ${STEPFUN_API_KEY:sk-xxxx}
+      model: step-3.7-flash
+    grok:
+      enable: ${GROK_ENABLE:false}
+      api-key: ${GROK_API_KEY:sk-xxxx}
+      model: grok-4.3
+    midjourney:
+      enable: ${MIDJOURNEY_ENABLE:false}
+      base-url: ${MIDJOURNEY_BASE_URL:https://api.holdai.top/mj}
+      api-key: ${MIDJOURNEY_API_KEY:sk-xxxx}
+      notify-url: ${MIDJOURNEY_NOTIFY_URL:http://127.0.0.1:48090/admin-api/ai/image/midjourney/notify} # 支付回调需公网可达
+    suno:
+      enable: ${SUNO_ENABLE:false}
+      base-url: ${SUNO_BASE_URL:http://127.0.0.1:3001}
+    web-search:
+      enable: ${WEB_SEARCH_ENABLE:false}
+      api-key: ${WEB_SEARCH_API_KEY:sk-xxxx}
+
+# ===== 调试模式 =====
+debug: false

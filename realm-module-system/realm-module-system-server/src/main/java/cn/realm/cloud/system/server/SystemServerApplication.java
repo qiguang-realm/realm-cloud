@@ -1,16 +1,18 @@
 package cn.realm.cloud.system.server;
 
 import lombok.extern.slf4j.Slf4j;
-import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
+ * System 模块启动类 / System module bootstrap class.
+ * <p>
+ * 说明：Mapper 扫描统一放在 MybatisPlusConfig 的 @MapperScan 上，这里不重复配置。
+ *
  * @author QI Guang
  */
 @Slf4j
 @SpringBootApplication
-@MapperScan("cn.realm.cloud.**.mapper")   // 通配符扫描："cn.realm.cloud.**.mapper"（扫描所有子包下的 mapper 包）
 public class SystemServerApplication {
 
     public static void main(String[] args) {

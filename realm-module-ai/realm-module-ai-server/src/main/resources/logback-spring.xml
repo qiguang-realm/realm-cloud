@@ -1,0 +1,19 @@
+<configuration>
+    <!-- ============================================================
+         Logback 日志配置
+         参考 Spring Boot defaults.xml / file-appender.xml
+         ============================================================ -->
+
+    <!-- ==== 日志格式 ==== -->
+    <property name="CONSOLE_LOG_PATTERN" value="..."/>
+    <property name="FILE_LOG_PATTERN" value="..."/>
+
+    <!-- ==== Appender ==== -->
+    <!-- STDOUT / FILE（保留 30 天，单文件 10MB）/ ASYNC（队列 512，不丢弃）/ SkyWalking（注释） -->
+
+    <!-- ==== Root ==== -->
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="ASYNC"/>
+    </root>
+</configuration>

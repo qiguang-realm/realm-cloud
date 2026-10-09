@@ -1,0 +1,143 @@
+# ============================================================
+# 应用名称与环境（infra-server，本地）
+# ============================================================
+
+spring:
+  # ---- 应用基础 ----
+  application:
+    name: infra-server
+
+  # profiles:
+  #   active: dev # 环境：local / dev / test / prod
+
+  # ---- 注册中心 + 配置中心 ----
+  cloud:
+    nacos:
+      server-addr: 127.0.0.1:8848
+      username:
+      password:
+      discovery:
+        enabled: false # 禁用服务发现客户端
+        register-enabled: false # 禁止服务注册
+        namespace: dev
+        group: DEFAULT_GROUP
+        metadata:
+          version: 1.0.0 # 用于灰度发布
+      config:
+        namespace: dev
+        group: DEFAULT_GROUP
+
+  # ---- 自动配置排除 ----
+  autoconfigure:
+    exclude:
+
+  # ---- 数据源 ----
+  datasource:
+    druid:
+      web-stat-filter:
+        enabled: true
+      stat-view-servlet:
+        enabled: true
+        allow: # 留空允许所有
+        url-pattern: /druid/*
+        login-username:
+        login-password:
+      filter:
+        stat:
+          enabled: true
+          log-slow-sql: true # 记录慢 SQL
+          slow-sql-millis: 100 # 慢 SQL 阈值（毫秒）
+          merge-sql: true
+        wall:
+          config:
+            multi-statement-allow: true # 允许多语句
+
+    dynamic:
+      primary: master
+      druid:
+        initial-size: 5 # 初始连接数
+        min-idle: 10 # 最小空闲连接
+        max-active: 20 # 最大活跃连接
+        max-wait: 60000 # 获取连接超时（毫秒）
+        time-between-eviction-runs-millis: 60000 # 空闲连接检测间隔
+        min-evictable-idle-time-millis: 600000 # 最小空闲存活时间
+        max-evictable-idle-time-millis: 1800000 # 最大空闲存活时间
+        validation-query: SELECT 1 FROM DUAL
+        test-while-idle: true
+        test-on-borrow: false
+        test-on-return: false
+        pool-prepared-statements: true # 启用 PreparedStatement 缓存
+        max-pool-prepared-statement-per-connection-size: 20 # 每连接最大缓存数
+
+      datasource:
+        master:
+          # ---- 本地开发（推荐）----
+          url: jdbc:mysql://127.0.0.1:3306/realm?useUnicode=true&characterEncoding=utf8&sslMode=DISABLED&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          # ---- 生产环境（推荐）----
+          # url: jdbc:mysql://prod-host:3306/realm?useUnicode=true&characterEncoding=utf8&sslMode=REQUIRED&serverTimezone=Asia/Shanghai&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          username: root
+          password: root
+        slave:
+          lazy: true # 懒加载，加快启动
+          # ---- 本地开发（推荐）----
+          url: jdbc:mysql://127.0.0.1:3306/realm?useUnicode=true&characterEncoding=utf8&sslMode=DISABLED&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          # ---- 生产环境（推荐）----
+          # url: jdbc:mysql://prod-host:3306/realm?useUnicode=true&characterEncoding=utf8&sslMode=REQUIRED&serverTimezone=Asia/Shanghai&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          username: root
+          password: root
+
+  # ---- Redis ----
+  data:
+    redis:
+      host: 192.168.2.193
+      port: 6379
+      database: 1
+      # password: 123456 # 生产建议开启
+
+  # ---- RabbitMQ ----
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: guest
+    password: guest
+
+  # ---- Kafka ----
+  kafka:
+    bootstrap-servers: 127.0.0.1:9092 # 多个用逗号分隔
+
+  # ---- Spring Boot Admin ----
+  boot:
+    admin:
+      client:
+        instance:
+          service-host-type: IP # 注册实例优先使用 IP
+        username: admin
+        password: admin
+      context-path: /admin # Admin Server 上下文路径
+
+# ===== 消息队列 =====
+rocketmq:
+  name-server: 127.0.0.1:9876 # Namesrv 地址
+
+# ===== 定时任务 =====
+xxl:
+  job:
+    admin:
+      addresses: http://127.0.0.1:9090/xxl-job-admin # 调度中心地址
+
+# ===== 服务保障 =====
+lock4j:
+  acquire-timeout: 3000 # 获取分布式锁超时（毫秒）
+  expire: 30000 # 锁超时（毫秒）
+
+# ===== 监控 =====
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: '*' # 开放所有端点
+
+# ===== Realm 自定义 =====
+realm:
+  demo: true # 演示模式

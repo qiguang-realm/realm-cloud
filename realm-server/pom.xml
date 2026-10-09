@@ -190,6 +190,13 @@
             <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
         </dependency>
 
+        <!-- 测试组件（test 作用域） / Test starter (test scope) -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- RPC 远程调用（排除 OpenFeign，以便单体启动时禁用） / RPC remote call (excludes OpenFeign to disable it in standalone mode) -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
