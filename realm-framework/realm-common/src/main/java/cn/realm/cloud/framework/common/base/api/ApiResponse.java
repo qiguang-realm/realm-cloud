@@ -179,10 +179,34 @@ public class ApiResponse<T> implements Serializable {
     /**
      * 完全自定义响应（允许任意 code、message 和 data）。
      *
-     * <p>适用于需要非标准业务状态码的场景。优先使用 {@link #success} / {@link #error}。
+     * <p>适用于需要非标准业务状态码或特殊数据的场景。
+     *
+     * @param code    业务状态码
+     * @param message 提示信息
+     * @param data    业务数据
+     * @param <T>     数据类型
+     * @return {@code ApiResponse<T>} 实例
      */
     public static <T> ApiResponse<T> of(int code, String message, T data) {
         return new ApiResponse<>(code, message, data);
+    }
+
+    /**
+     * 完全自定义响应（无业务数据）。
+     *
+     * <p><b>为什么需要这个方法？</b>调用 {@code of(code, message, null)} 时，
+     * Java 类型推断会将 {@code T} 推断为 {@code Object}，导致无法赋值给
+     * {@code ApiResponse<Void>}。本方法直接返回 {@code ApiResponse<Void>}，
+     * 避免调用方显式写 {@code ApiResponse.<Void>of(...)}。
+     *
+     * <p>适用于错误响应、删除成功等"无返回数据"的场景。
+     *
+     * @param code    业务状态码
+     * @param message 提示信息
+     * @return {@code ApiResponse<Void>} 实例
+     */
+    public static ApiResponse<Void> of(int code, String message) {
+        return new ApiResponse<>(code, message, null);
     }
 
     // ---------- 实例方法 ----------
