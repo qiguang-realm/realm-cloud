@@ -73,9 +73,9 @@
 
         <!-- 监控 / Monitoring -->
         <!-- SkyWalking 链路追踪 / Tracing -->
-        <skywalking.version>9.5.0</skywalking.version>
+        <skywalking.version>9.7.0</skywalking.version>
         <!-- Spring Boot Admin -->
-        <spring-boot-admin.version>3.5.2</spring-boot-admin.version>
+        <spring-boot-admin.version>3.5.9</spring-boot-admin.version>
         <!-- OpenTracing API -->
         <opentracing.version>0.33.0</opentracing.version>
         <!-- OpenTelemetry -->
@@ -350,6 +350,17 @@
                 <artifactId>mybatis-plus-join-boot-starter</artifactId>
                 <version>${mybatis-plus-join.version}</version>
             </dependency>
+            <!-- Spring Data JPA -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-data-jpa</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.realm.cloud</groupId>
+                <artifactId>realm-spring-boot-starter-data-jpa</artifactId>
+                <version>${revision}</version>
+            </dependency>
             <!-- Easy-Trans 数据翻译 / Data translation -->
             <dependency>
                 <groupId>org.dromara</groupId>
@@ -492,17 +503,12 @@
             <!-- SkyWalking -->
             <dependency>
                 <groupId>org.apache.skywalking</groupId>
-                <artifactId>apm-toolkit-trace</artifactId>
-                <version>${skywalking.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.skywalking</groupId>
                 <artifactId>apm-toolkit-logback-1.x</artifactId>
                 <version>${skywalking.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.skywalking</groupId>
-                <artifactId>apm-toolkit-opentracing</artifactId>
+                <artifactId>apm-toolkit-trace</artifactId>
                 <version>${skywalking.version}</version>
             </dependency>
             <dependency>

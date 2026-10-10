@@ -4,30 +4,51 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.Serial;
 import java.lang.reflect.Type;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Objects;
 import java.util.TimeZone;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 /**
- * Jackson JSON 工具类（线程安全，不可变）。
- * <p>
- * 提供高效、安全的 JSON 序列化与反序列化方法，支持泛型、集合以及复杂嵌套类型。
- * 所有方法均采用统一的异常体系 {@link JacksonException}，将受检异常转换为运行时异常，
- * 避免调用方强制捕获。同时提供安全方法（后缀 OrNull）在异常时返回 {@code null} 并记录日志。
- * </p>
+ * Jackson JSON 工具类（线程安全）。
  *
- * <h3>使用示例</h3>
+ * <p><b>能力：</b>
+ * <ul>
+ *     <li>序列化：{@link #toJsonString(Object)}、{@link #toJsonBytes(Object)}、{@link #writeValue(OutputStream, Object)}</li>
+ *     <li>反序列化：{@link #parseObject(String, Class)}、{@link #parseArray(String, Class)}、{@link #parseObject(String, Type)}</li>
+ *     <li>JSON 树模型：{@link #readTree(String)}、{@link #createObjectNode()}</li>
+ *     <li>对象转换：{@link #convertValue(Object, Class)}</li>
+ *     <li>安全版本（后缀 {@code OrNull}）：异常时返回 {@code null} 并记录警告日志</li>
+ * </ul>
+ *
+ * <p><b>线程安全：</b>本类所有方法均为线程安全。{@link #getObjectMapper()} 返回的实例
+ * 可被多处共享；如需定制配置，请使用 {@link #copyObjectMapper()} 获取独立副本。
+ *
+ * <p><b>非标准 JSON 支持：</b>默认允许 JSON 中包含注释（{@code //} 与 {@code /*}），
+ * 这是非标准特性，便于调试。如需严格标准 JSON 解析，请使用 {@link #copyObjectMapper()}
+ * 后自行调整配置。
+ *
+ * <p><b>敏感数据：</b>异常消息与日志中<b>只包含 JSON 前 200 字符</b>，
+ * 避免大 JSON 撑爆日志或泄露敏感数据（CWE-209 / CWE-532）。
+ *
+ * <p><b>使用示例：</b>
  * <pre>{@code
  * // 序列化
  * String json = JsonUtils.toJsonString(user);
@@ -46,27 +67,40 @@ import java.util.concurrent.ConcurrentMap;
  * }</pre>
  *
  * @author QI Guang
- * @version 1.0.0
+ * @since 1.0.0
  */
 public final class JsonUtils {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(JsonUtils.class);
+    private static final Logger log = LoggerFactory.getLogger(JsonUtils.class);
 
     /**
-     * 全局共享的 ObjectMapper 实例，配置完成后不可变，线程安全。
+     * 异常消息与日志中 JSON 的最大展示长度。
+     * <p>防止大 JSON 撑爆日志或泄露敏感数据。
+     */
+    private static final int JSON_ABBREVIATE_LENGTH = 200;
+
+    /**
+     * 类型缓存的最大容量。
+     * <p>通过 Guava Cache 限制容量，防止动态类型导致 OOM。
+     */
+    private static final int TYPE_CACHE_MAX_SIZE = 10_000;
+
+    /**
+     * 全局共享的 {@link ObjectMapper} 实例，配置完成后不可变，线程安全。
      */
     private static final ObjectMapper OBJECT_MAPPER = createDefaultObjectMapper();
 
     /**
-     * JavaType 缓存，用于提升复杂泛型类型的解析性能。
-     * 使用 ConcurrentHashMap 保证线程安全，键为 Type，值为对应的 JavaType。
-     * 注意：如果应用频繁使用动态生成的匿名 Type（如匿名内部类），可能导致缓存膨胀，
-     * 建议在必要时调用 {@link #clearTypeCache()} 清理。
+     * {@link JavaType} 缓存，用于提升复杂泛型类型的解析性能。
+     * <p>使用 Guava Cache 限制最大容量，防止动态类型无限增长导致 OOM。
      */
-    private static final ConcurrentMap<Type, JavaType> TYPE_CACHE = new ConcurrentHashMap<>(64);
+    private static final Cache<Type, JavaType> TYPE_CACHE = CacheBuilder.newBuilder()
+            .maximumSize(TYPE_CACHE_MAX_SIZE)
+            .build();
 
     private JsonUtils() {
-        throw new IllegalStateException("JsonUtils 工具类不允许实例化");
+        throw new UnsupportedOperationException(
+                "JsonUtils is a static utility class and cannot be instantiated");
     }
 
     // ======================== 初始化配置 ========================
@@ -77,9 +111,7 @@ public final class JsonUtils {
         // ----- 反序列化配置 -----
         // 忽略 JSON 中存在而 Java 对象没有的字段
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-        // 允许使用单引号（非标准，视场景开启，默认关闭）
-        // mapper.enable(JsonParser.Feature.ALLOW_SINGLE_QUOTES);
-        // 允许使用注释（调试友好）
+        // 允许 JSON 中包含注释（非标准特性，便于调试）
         mapper.enable(JsonParser.Feature.ALLOW_COMMENTS);
 
         // ----- 序列化配置 -----
@@ -90,11 +122,11 @@ public final class JsonUtils {
         // 只包含非 null 属性，减少传输体积
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
 
-        // ----- 其他全局配置 -----
+        // ----- 时区配置 -----
         // 统一时区为 UTC，避免不同环境日期解析不一致
-        mapper.setTimeZone(TimeZone.getTimeZone("UTC"));
+        mapper.setTimeZone(TimeZone.getTimeZone(ZoneOffset.UTC));
 
-        // 注册 Java 8 时间模块（LocalDate, LocalDateTime 等）
+        // ----- Java 8 时间模块 -----
         mapper.registerModule(new JavaTimeModule());
 
         return mapper;
@@ -103,21 +135,19 @@ public final class JsonUtils {
     // ======================== 公共访问 ========================
 
     /**
-     * 获取全局共享的 ObjectMapper 实例（已配置完整）。
-     * 注意：返回的实例是线程安全的，但对其的任何修改（如配置变更）将影响全局。
-     * 如需独立配置，请使用 {@link #copyObjectMapper()}。
+     * 获取全局共享的 {@link ObjectMapper} 实例。
      *
-     * @return 全局 ObjectMapper
+     * <p><b>注意：</b>返回的实例线程安全，但对其的任何配置修改会影响全局。
+     * 如需独立配置，请使用 {@link #copyObjectMapper()}。
      */
     public static ObjectMapper getObjectMapper() {
         return OBJECT_MAPPER;
     }
 
     /**
-     * 复制一份与全局配置完全相同的 ObjectMapper 实例。
-     * 适用于需要临时定制配置（如开启/关闭特定特性）且不影响全局的场景。
+     * 复制一份与全局配置完全相同的 {@link ObjectMapper} 实例。
      *
-     * @return 独立的 ObjectMapper 副本
+     * <p>适用于需要临时定制配置（如开启/关闭特定特性）且不影响全局的场景。
      */
     public static ObjectMapper copyObjectMapper() {
         return OBJECT_MAPPER.copy();
@@ -125,23 +155,25 @@ public final class JsonUtils {
 
     /**
      * 清理类型缓存，释放内存。
-     * 当应用中动态生成了大量 Type 对象时，可定期调用此方法防止缓存膨胀。
+     *
+     * <p>正常情况下无需调用；如应用中动态生成了大量不同泛型类型，
+     * 可定期调用此方法防止缓存膨胀。
      */
     public static void clearTypeCache() {
-        TYPE_CACHE.clear();
-        LOGGER.debug("Jackson Type cache cleared.");
+        TYPE_CACHE.invalidateAll();
+        log.debug("[clearTypeCache] Type cache cleared.");
     }
 
-    // ======================== 序列化（对象 → JSON） ========================
+    // ======================== 序列化 ========================
 
     /**
      * 将对象序列化为紧凑格式的 JSON 字符串。
      *
-     * @param obj 待序列化对象（可为 null，此时序列化结果为 "null"）
+     * @param obj 待序列化对象（可为 {@code null}，序列化结果为 {@code "null"}）
      * @return JSON 字符串
      * @throws JacksonException 序列化失败时抛出
      */
-    public static String toJsonString(Object obj) throws JacksonException {
+    public static String toJsonString(Object obj) {
         try {
             return OBJECT_MAPPER.writeValueAsString(obj);
         } catch (JsonProcessingException e) {
@@ -151,27 +183,21 @@ public final class JsonUtils {
 
     /**
      * 安全版本：将对象序列化为 JSON 字符串，异常时返回 {@code null} 并记录警告日志。
-     *
-     * @param obj 待序列化对象
-     * @return JSON 字符串，失败返回 {@code null}
      */
     public static String toJsonStringOrNull(Object obj) {
         try {
             return toJsonString(obj);
         } catch (JacksonException e) {
-            LOGGER.warn("Failed to serialize object to JSON, returning null. obj: {}", obj, e);
+            log.warn("[toJsonStringOrNull] serialize failed, objType={}",
+                    obj != null ? obj.getClass().getName() : "null", e);
             return null;
         }
     }
 
     /**
      * 将对象序列化为格式化的（缩进）JSON 字符串，便于调试。
-     *
-     * @param obj 待序列化对象
-     * @return 格式化后的 JSON 字符串
-     * @throws JacksonException 序列化失败时抛出
      */
-    public static String toPrettyJsonString(Object obj) throws JacksonException {
+    public static String toPrettyJsonString(Object obj) {
         try {
             return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(obj);
         } catch (JsonProcessingException e) {
@@ -181,27 +207,21 @@ public final class JsonUtils {
 
     /**
      * 安全版本：格式化序列化，异常时返回 {@code null} 并记录警告日志。
-     *
-     * @param obj 待序列化对象
-     * @return 格式化 JSON 字符串，失败返回 {@code null}
      */
     public static String toPrettyJsonStringOrNull(Object obj) {
         try {
             return toPrettyJsonString(obj);
         } catch (JacksonException e) {
-            LOGGER.warn("Failed to serialize object to pretty JSON, returning null. obj: {}", obj, e);
+            log.warn("[toPrettyJsonStringOrNull] serialize failed, objType={}",
+                    obj != null ? obj.getClass().getName() : "null", e);
             return null;
         }
     }
 
     /**
      * 将对象序列化为字节数组。
-     *
-     * @param obj 待序列化对象
-     * @return JSON 字节数组
-     * @throws JacksonException 序列化失败时抛出
      */
-    public static byte[] toJsonBytes(Object obj) throws JacksonException {
+    public static byte[] toJsonBytes(Object obj) {
         try {
             return OBJECT_MAPPER.writeValueAsBytes(obj);
         } catch (JsonProcessingException e) {
@@ -210,13 +230,10 @@ public final class JsonUtils {
     }
 
     /**
-     * 将对象序列化并写入输出流。
-     *
-     * @param out 输出流（不会自动关闭）
-     * @param obj 待序列化对象
-     * @throws JacksonException 序列化或 I/O 错误时抛出
+     * 将对象序列化并写入输出流（不自动关闭流）。
      */
-    public static void writeValue(OutputStream out, Object obj) throws JacksonException {
+    public static void writeValue(OutputStream out, Object obj) {
+        Objects.requireNonNull(out, "out must not be null");
         try {
             OBJECT_MAPPER.writeValue(out, obj);
         } catch (IOException e) {
@@ -224,115 +241,108 @@ public final class JsonUtils {
         }
     }
 
-    // ======================== 反序列化（JSON → 对象） ========================
+    // ======================== 反序列化 ========================
 
     /**
-     * 将 JSON 字符串解析为指定类型的对象。
-     *
-     * @param json  JSON 字符串（不能为 null 或空）
-     * @param clazz 目标类型 Class
-     * @param <T>   目标类型
-     * @return 解析后的对象
-     * @throws JacksonException 解析失败或输入为空时抛出
+     * 将 JSON 字符串解析为指定类型对象。
      */
-    public static <T> T parseObject(String json, Class<T> clazz) throws JacksonException {
-        if (json == null || json.isEmpty()) {
-            throw new JacksonException("JSON string is null or empty");
-        }
+    public static <T> T parseObject(String json, Class<T> clazz) {
+        requireNonEmptyJson(json);
+        Objects.requireNonNull(clazz, "clazz must not be null");
         try {
             return OBJECT_MAPPER.readValue(json, clazz);
         } catch (JsonProcessingException e) {
-            throw new JacksonException("Failed to parse JSON: " + json, e);
+            throw parseException("parseObject", json, clazz.getSimpleName(), e);
         }
     }
 
     /**
-     * 安全版本：解析 JSON，异常时返回 {@code null}。
-     *
-     * @param json  JSON 字符串
-     * @param clazz 目标类型
-     * @param <T>   目标类型
-     * @return 解析后的对象，失败返回 {@code null}
+     * 安全版本：解析 JSON，异常时返回 {@code null} 并记录警告日志。
      */
     public static <T> T parseObjectOrNull(String json, Class<T> clazz) {
         try {
             return parseObject(json, clazz);
         } catch (JacksonException e) {
-            LOGGER.warn("Failed to parse JSON to {}, returning null. json: {}", clazz.getSimpleName(), json, e);
+            log.warn("[parseObjectOrNull] parse failed, targetType={}, json={}",
+                    clazz != null ? clazz.getSimpleName() : "null", abbreviate(json), e);
             return null;
         }
     }
 
     /**
-     * 将 JSON 字符串解析为复杂类型（支持泛型、集合等）。
-     * <p>示例：{@code Map<String, List<User>> map = parseObject(json, new TypeReference<Map<String, List<User>>>() {});}</p>
-     *
-     * @param json          JSON 字符串
-     * @param typeReference 类型引用
-     * @param <T>           目标类型
-     * @return 解析后的对象
-     * @throws JacksonException 解析失败时抛出
+     * 将 JSON 字符串解析为复杂类型对象（支持泛型、集合等）。
      */
-    public static <T> T parseObject(String json, TypeReference<T> typeReference) throws JacksonException {
-        if (json == null || json.isEmpty()) {
-            throw new JacksonException("JSON string is null or empty");
-        }
+    public static <T> T parseObject(String json, TypeReference<T> typeReference) {
+        requireNonEmptyJson(json);
+        Objects.requireNonNull(typeReference, "typeReference must not be null");
         try {
             return OBJECT_MAPPER.readValue(json, typeReference);
         } catch (JsonProcessingException e) {
-            throw new JacksonException("Failed to parse JSON with TypeReference: " + json, e);
+            throw parseException("parseObject", json, typeReference.getType().getTypeName(), e);
         }
     }
 
     /**
-     * 将 JSON 字符串解析为指定 Java {@link Type} 的对象。
-     * 适用于无法使用 Class 或 TypeReference 的场景（如 Spring 的 ParameterizedTypeReference）。
-     *
-     * @param json JSON 字符串
-     * @param type Java Type
-     * @param <T>  目标类型
-     * @return 解析后的对象
-     * @throws JacksonException 解析失败时抛出
+     * 安全版本：按 {@link TypeReference} 解析，异常时返回 {@code null}。
      */
-    public static <T> T parseObject(String json, Type type) throws JacksonException {
-        if (json == null || json.isEmpty()) {
-            throw new JacksonException("JSON string is null or empty");
+    public static <T> T parseObjectOrNull(String json, TypeReference<T> typeReference) {
+        try {
+            return parseObject(json, typeReference);
+        } catch (JacksonException e) {
+            log.warn("[parseObjectOrNull] parse failed, targetType={}, json={}",
+                    typeReference != null ? typeReference.getType().getTypeName() : "null",
+                    abbreviate(json), e);
+            return null;
         }
+    }
+
+    /**
+     * 将 JSON 字符串解析为指定 {@link Type} 的对象。
+     */
+    public static <T> T parseObject(String json, Type type) {
+        requireNonEmptyJson(json);
+        Objects.requireNonNull(type, "type must not be null");
         try {
             JavaType javaType = getCachedJavaType(type);
             return OBJECT_MAPPER.readValue(json, javaType);
         } catch (JsonProcessingException e) {
-            throw new JacksonException("Failed to parse JSON with Type: " + json, e);
+            throw parseException("parseObject", json, type.getTypeName(), e);
         }
     }
 
     /**
-     * 从输入流解析 JSON 为指定类型对象。
-     *
-     * @param inputStream 输入流（不会自动关闭）
-     * @param clazz       目标类型
-     * @param <T>         目标类型
-     * @return 解析后的对象
-     * @throws JacksonException 解析或 I/O 错误时抛出
+     * 安全版本：按 {@link Type} 解析，异常时返回 {@code null}。
      */
-    public static <T> T parseObject(InputStream inputStream, Class<T> clazz) throws JacksonException {
+    public static <T> T parseObjectOrNull(String json, Type type) {
+        try {
+            return parseObject(json, type);
+        } catch (JacksonException e) {
+            log.warn("[parseObjectOrNull] parse failed, targetType={}, json={}",
+                    type != null ? type.getTypeName() : "null", abbreviate(json), e);
+            return null;
+        }
+    }
+
+    /**
+     * 从输入流解析 JSON 为指定类型对象（不自动关闭流）。
+     */
+    public static <T> T parseObject(InputStream inputStream, Class<T> clazz) {
+        Objects.requireNonNull(inputStream, "inputStream must not be null");
+        Objects.requireNonNull(clazz, "clazz must not be null");
         try {
             return OBJECT_MAPPER.readValue(inputStream, clazz);
         } catch (IOException e) {
-            throw new JacksonException("Failed to parse InputStream to " + clazz.getSimpleName(), e);
+            throw new JacksonException(
+                    "Failed to parse InputStream to " + clazz.getSimpleName(), e);
         }
     }
 
     /**
-     * 从输入流解析 JSON 为复杂类型对象（支持泛型）。
-     *
-     * @param inputStream   输入流
-     * @param typeReference 类型引用
-     * @param <T>           目标类型
-     * @return 解析后的对象
-     * @throws JacksonException 解析或 I/O 错误时抛出
+     * 从输入流解析 JSON 为复杂类型对象（不自动关闭流）。
      */
-    public static <T> T parseObject(InputStream inputStream, TypeReference<T> typeReference) throws JacksonException {
+    public static <T> T parseObject(InputStream inputStream, TypeReference<T> typeReference) {
+        Objects.requireNonNull(inputStream, "inputStream must not be null");
+        Objects.requireNonNull(typeReference, "typeReference must not be null");
         try {
             return OBJECT_MAPPER.readValue(inputStream, typeReference);
         } catch (IOException e) {
@@ -342,31 +352,24 @@ public final class JsonUtils {
 
     /**
      * 从字节数组解析 JSON 为指定类型对象。
-     *
-     * @param bytes JSON 字节数组
-     * @param clazz 目标类型
-     * @param <T>   目标类型
-     * @return 解析后的对象
-     * @throws JacksonException 解析失败时抛出
      */
-    public static <T> T parseObject(byte[] bytes, Class<T> clazz) throws JacksonException {
+    public static <T> T parseObject(byte[] bytes, Class<T> clazz) {
+        Objects.requireNonNull(bytes, "bytes must not be null");
+        Objects.requireNonNull(clazz, "clazz must not be null");
         try {
             return OBJECT_MAPPER.readValue(bytes, clazz);
         } catch (IOException e) {
-            throw new JacksonException("Failed to parse byte[] to " + clazz.getSimpleName(), e);
+            throw new JacksonException(
+                    "Failed to parse byte[] to " + clazz.getSimpleName(), e);
         }
     }
 
     /**
      * 从字节数组解析 JSON 为复杂类型对象。
-     *
-     * @param bytes         JSON 字节数组
-     * @param typeReference 类型引用
-     * @param <T>           目标类型
-     * @return 解析后的对象
-     * @throws JacksonException 解析失败时抛出
      */
-    public static <T> T parseObject(byte[] bytes, TypeReference<T> typeReference) throws JacksonException {
+    public static <T> T parseObject(byte[] bytes, TypeReference<T> typeReference) {
+        Objects.requireNonNull(bytes, "bytes must not be null");
+        Objects.requireNonNull(typeReference, "typeReference must not be null");
         try {
             return OBJECT_MAPPER.readValue(bytes, typeReference);
         } catch (IOException e) {
@@ -376,67 +379,47 @@ public final class JsonUtils {
 
     /**
      * 将 JSON 数组字符串解析为 {@link List} 集合。
-     * <p>示例：{@code List<User> users = parseArray(json, User.class);}</p>
-     *
-     * @param json  JSON 数组字符串
-     * @param clazz 集合元素类型
-     * @param <T>   元素类型
-     * @return 解析后的 List
-     * @throws JacksonException 解析失败时抛出
      */
-    public static <T> List<T> parseArray(String json, Class<T> clazz) throws JacksonException {
-        if (json == null || json.isEmpty()) {
-            throw new JacksonException("JSON string is null or empty");
-        }
+    public static <T> List<T> parseArray(String json, Class<T> clazz) {
+        requireNonEmptyJson(json);
+        Objects.requireNonNull(clazz, "clazz must not be null");
         try {
             return OBJECT_MAPPER.readValue(json,
                     OBJECT_MAPPER.getTypeFactory().constructCollectionType(List.class, clazz));
         } catch (JsonProcessingException e) {
-            throw new JacksonException("Failed to parse JSON array: " + json, e);
+            throw parseException("parseArray", json, "List<" + clazz.getSimpleName() + ">", e);
         }
     }
 
     /**
-     * 安全版本：解析 JSON 数组为 List，异常时返回 {@code null}。
-     *
-     * @param json  JSON 数组字符串
-     * @param clazz 元素类型
-     * @param <T>   元素类型
-     * @return 解析后的 List，失败返回 {@code null}
+     * 安全版本：解析 JSON 数组为 {@link List}，异常时返回 {@code null}。
      */
     public static <T> List<T> parseArrayOrNull(String json, Class<T> clazz) {
         try {
             return parseArray(json, clazz);
         } catch (JacksonException e) {
-            LOGGER.warn("Failed to parse JSON array to List<{}>, returning null. json: {}", clazz.getSimpleName(), json, e);
+            log.warn("[parseArrayOrNull] parse failed, elementType={}, json={}",
+                    clazz != null ? clazz.getSimpleName() : "null", abbreviate(json), e);
             return null;
         }
     }
 
-    // ======================== JSON 树模型操作 ========================
+    // ======================== JSON 树模型 ========================
 
     /**
      * 将 JSON 字符串解析为 {@link JsonNode} 树模型，用于动态操作。
-     *
-     * @param json JSON 字符串
-     * @return JsonNode 根节点
-     * @throws JacksonException 解析失败时抛出
      */
-    public static JsonNode readTree(String json) throws JacksonException {
-        if (json == null || json.isEmpty()) {
-            throw new JacksonException("JSON string is null or empty");
-        }
+    public static JsonNode readTree(String json) {
+        requireNonEmptyJson(json);
         try {
             return OBJECT_MAPPER.readTree(json);
         } catch (JsonProcessingException e) {
-            throw new JacksonException("Failed to parse JSON to JsonNode: " + json, e);
+            throw parseException("readTree", json, "JsonNode", e);
         }
     }
 
     /**
      * 创建一个空的 {@link ObjectNode}，用于构建 JSON 对象。
-     *
-     * @return 空的 ObjectNode
      */
     public static ObjectNode createObjectNode() {
         return OBJECT_MAPPER.createObjectNode();
@@ -446,32 +429,22 @@ public final class JsonUtils {
 
     /**
      * 将已知对象转换为指定类型的对象（基于类型转换）。
-     * <p>示例：{@code UserDTO dto = convertValue(userEntity, UserDTO.class);}</p>
-     *
-     * @param fromValue   源对象
-     * @param toValueType 目标类型 Class
-     * @param <T>         目标类型
-     * @return 转换后的对象
-     * @throws JacksonException 转换失败时抛出
      */
-    public static <T> T convertValue(Object fromValue, Class<T> toValueType) throws JacksonException {
+    public static <T> T convertValue(Object fromValue, Class<T> toValueType) {
+        Objects.requireNonNull(toValueType, "toValueType must not be null");
         try {
             return OBJECT_MAPPER.convertValue(fromValue, toValueType);
         } catch (IllegalArgumentException e) {
-            throw new JacksonException("Failed to convert value to " + toValueType.getName(), e);
+            throw new JacksonException(
+                    "Failed to convert value to " + toValueType.getName(), e);
         }
     }
 
     /**
      * 将已知对象转换为复杂类型对象（支持泛型）。
-     *
-     * @param fromValue   源对象
-     * @param toValueType 类型引用
-     * @param <T>         目标类型
-     * @return 转换后的对象
-     * @throws JacksonException 转换失败时抛出
      */
-    public static <T> T convertValue(Object fromValue, TypeReference<T> toValueType) throws JacksonException {
+    public static <T> T convertValue(Object fromValue, TypeReference<T> toValueType) {
+        Objects.requireNonNull(toValueType, "toValueType must not be null");
         try {
             return OBJECT_MAPPER.convertValue(fromValue, toValueType);
         } catch (IllegalArgumentException e) {
@@ -482,13 +455,49 @@ public final class JsonUtils {
     // ======================== 内部工具方法 ========================
 
     /**
-     * 从缓存中获取或构建 JavaType，减少重复构造开销。
-     *
-     * @param type Java Type
-     * @return 对应的 JavaType
+     * 从缓存中获取或构建 {@link JavaType}，减少重复构造开销。
      */
     private static JavaType getCachedJavaType(Type type) {
-        return TYPE_CACHE.computeIfAbsent(type, t -> OBJECT_MAPPER.getTypeFactory().constructType(t));
+        JavaType cached = TYPE_CACHE.getIfPresent(type);
+        if (cached != null) {
+            return cached;
+        }
+        JavaType javaType = OBJECT_MAPPER.getTypeFactory().constructType(type);
+        TYPE_CACHE.put(type, javaType);
+        return javaType;
+    }
+
+    /**
+     * 校验 JSON 字符串非空。
+     */
+    private static void requireNonEmptyJson(String json) {
+        if (json == null || json.isEmpty()) {
+            throw new JacksonException("JSON string is null or empty");
+        }
+    }
+
+    /**
+     * 构造解析异常，JSON 只截取前 {@value #JSON_ABBREVIATE_LENGTH} 字符。
+     */
+    private static JacksonException parseException(String operation, String json,
+                                                   String targetType, Throwable cause) {
+        return new JacksonException(
+                "Failed to " + operation + " to " + targetType
+                        + ", json=" + abbreviate(json), cause);
+    }
+
+    /**
+     * 截断文本到指定长度，用于日志与异常消息，避免泄露完整敏感数据。
+     */
+    private static String abbreviate(String text) {
+        if (text == null) {
+            return "null";
+        }
+        if (text.length() <= JSON_ABBREVIATE_LENGTH) {
+            return text;
+        }
+        return text.substring(0, JSON_ABBREVIATE_LENGTH)
+                + "...(total " + text.length() + " chars)";
     }
 
     // ======================== 自定义异常 ========================
@@ -497,6 +506,10 @@ public final class JsonUtils {
      * Jackson 运行时异常，将受检异常包装为非受检异常。
      */
     public static class JacksonException extends RuntimeException {
+
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         public JacksonException(String message) {
             super(message);
         }

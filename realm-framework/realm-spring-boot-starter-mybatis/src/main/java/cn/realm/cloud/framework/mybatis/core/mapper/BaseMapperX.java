@@ -3,11 +3,9 @@ package cn.realm.cloud.framework.mybatis.core.mapper;
 import cn.hutool.core.collection.CollUtil;
 import cn.realm.cloud.framework.common.pojo.PageParam;
 import cn.realm.cloud.framework.common.pojo.PageResult;
+import cn.realm.cloud.framework.common.pojo.SortField;
 import cn.realm.cloud.framework.common.pojo.SortablePageParam;
-import cn.realm.cloud.framework.common.pojo.SortingField;
-import cn.realm.cloud.framework.mybatis.core.util.JdbcUtils;
-import cn.realm.cloud.framework.mybatis.core.util.MyBatisUtils;
-import com.baomidou.mybatisplus.annotation.DbType;
+import cn.realm.cloud.framework.mybatis.core.util.MyBatisPageUtils;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -24,288 +22,310 @@ import org.apache.ibatis.annotations.Param;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 /**
- * 在 MyBatis Plus 的 BaseMapper 基础上拓展，提供更多的能力。
- * <p>
- * 该接口结合了：
+ * 在 MyBatis-Plus 的 {@link BaseMapper} 基础上扩展，提供更丰富的分页、连表、批量操作能力。
+ *
+ * <p>本接口整合：
  * <ul>
- *   <li>{@link BaseMapper} – 基础 CRUD 操作</li>
- *   <li>{@link MPJBaseMapper} – 连表查询支持</li>
+ *     <li>{@link BaseMapper}：MyBatis-Plus 基础 CRUD 能力</li>
+ *     <li>{@link MPJBaseMapper}：MyBatis-Plus-Join 连表查询能力</li>
  * </ul>
  *
- * <p><b>安全说明：</b>所有涉及排序字段的方法，均需确保 {@link SortingField # @link field} 已在业务层通过白名单校验，
- * 防止 SQL 注入。本接口不提供自动白名单过滤，请调用方自行保证。
+ * <p><b>安全说明（CWE-89 / OWASP ASVS 5.3.4）：</b>
+ * 所有涉及字段名的方法，均提供 {@code String} 与 {@code SFunction} 两个版本。
+ * {@code String} 版本因存在 SQL 注入风险，已标记 {@link Deprecated}；
+ * 新代码必须使用 Lambda 版本。排序字段必须通过 {@code allowedFields} 白名单传入。
+ *
+ * <p><b>跨数据库兼容性：</b>
+ * {@link #selectOneForUpdate} 与 {@link #selectFirstForUpdate} 依赖 {@code FOR UPDATE} 语法，
+ * <b>仅支持 MySQL / PostgreSQL / Oracle / 达梦 / 金仓</b>；SQL Server 需在子接口中 override。
  *
  * @param <T> 实体类型
  * @author QI Guang
  */
 public interface BaseMapperX<T> extends MPJBaseMapper<T> {
 
+    /**
+     * 查询首条记录时的固定分页大小。
+     */
+    int FIRST_PAGE_SIZE = 1;
+
     // ==================== 分页查询 ====================
 
     /**
-     * 分页查询（支持排序）
-     *
-     * @param pageParam    可排序分页参数
-     * @param queryWrapper 查询条件包装器
-     * @return 分页结果，包含记录列表和总条数
-     */
-    default PageResult<T> selectPage(SortablePageParam pageParam, @Param("ew") Wrapper<T> queryWrapper) {
-        return selectPage(pageParam, pageParam.getSortingFields(), queryWrapper);
-    }
-
-    /**
-     * 分页查询（无排序）
-     *
-     * @param pageParam    分页参数
-     * @param queryWrapper 查询条件包装器
-     * @return 分页结果
+     * 分页查询（无排序）。
      */
     default PageResult<T> selectPage(PageParam pageParam, @Param("ew") Wrapper<T> queryWrapper) {
-        return selectPage(pageParam, null, queryWrapper);
+        return selectPage(pageParam, MyBatisPageUtils.EMPTY_SORTS, queryWrapper);
     }
 
     /**
-     * 分页查询（支持自定义排序字段集合）
+     * 分页查询（带排序，白名单强校验）。
      *
-     * @param pageParam     分页参数
-     * @param sortingFields 排序字段列表（可为空）
-     * @param queryWrapper  查询条件包装器
-     * @return 分页结果
+     * @param pageParam     分页 + 排序参数
+     * @param allowedFields 允许排序的字段白名单（数据库列名）
+     * @param queryWrapper  查询条件
      */
-    default PageResult<T> selectPage(PageParam pageParam, Collection<SortingField> sortingFields,
+    default PageResult<T> selectPage(SortablePageParam pageParam, Set<String> allowedFields,
                                      @Param("ew") Wrapper<T> queryWrapper) {
-        // 特殊：不分页，直接查询全部（不分页模式）
-        if (PageParam.PAGE_SIZE_NONE.equals(pageParam.getPageSize())) {
-            MyBatisUtils.addOrder(queryWrapper, sortingFields);
+        return selectPage(pageParam, pageParam.parseSortFields(allowedFields), queryWrapper);
+    }
+
+    /**
+     * 分页查询（核心实现）。
+     */
+    default PageResult<T> selectPage(PageParam pageParam, List<SortField> sortFields,
+                                     @Param("ew") Wrapper<T> queryWrapper) {
+        // 不分页模式：查询全部并附加排序
+        if (!pageParam.isPaged()) {
+            MyBatisPageUtils.addOrder(queryWrapper, sortFields);
             List<T> list = selectList(queryWrapper);
-            return new PageResult<>(list, (long) list.size());
+            return PageResult.of(list, list.size(), list.size(), 1);
         }
 
-        // 构建 MyBatis Plus 分页对象，并应用排序
-        IPage<T> mpPage = MyBatisUtils.buildPage(pageParam, sortingFields);
-        selectPage(mpPage, queryWrapper);
-        return new PageResult<>(mpPage.getRecords(), mpPage.getTotal());
+        // 分页模式
+        Page<T> page = MyBatisPageUtils.toPage(pageParam);
+        MyBatisPageUtils.addOrder(page, sortFields);
+        selectPage(page, queryWrapper);
+        return MyBatisPageUtils.toPageResult(page);
     }
 
     // ==================== 连表分页查询 ====================
 
     /**
-     * 连表分页查询（无排序）
-     *
-     * @param pageParam     分页参数
-     * @param clazz         返回结果类型
-     * @param lambdaWrapper 连表查询条件包装器
-     * @param <D>           返回结果泛型
-     * @return 分页结果
+     * 连表分页查询（无排序）。
      */
-    default <D> PageResult<D> selectJoinPage(PageParam pageParam, Class<D> clazz, MPJLambdaWrapper<T> lambdaWrapper) {
-        if (PageParam.PAGE_SIZE_NONE.equals(pageParam.getPageSize())) {
+    default <D> PageResult<D> selectJoinPage(PageParam pageParam, Class<D> clazz,
+                                             MPJLambdaWrapper<T> lambdaWrapper) {
+        if (!pageParam.isPaged()) {
             List<D> list = selectJoinList(clazz, lambdaWrapper);
-            return new PageResult<>(list, (long) list.size());
+            return PageResult.of(list, list.size(), list.size(), 1);
         }
-
-        IPage<D> mpPage = MyBatisUtils.buildPage(pageParam);
-        mpPage = selectJoinPage(mpPage, clazz, lambdaWrapper);
-        return new PageResult<>(mpPage.getRecords(), mpPage.getTotal());
+        Page<D> page = MyBatisPageUtils.toPage(pageParam);
+        IPage<D> result = selectJoinPage(page, clazz, lambdaWrapper);
+        return MyBatisPageUtils.toPageResult(result);
     }
 
     /**
-     * 连表分页查询（支持排序）
-     *
-     * @param pageParam     可排序分页参数
-     * @param clazz         返回结果类型
-     * @param lambdaWrapper 连表查询条件包装器
-     * @param <D>           返回结果泛型
-     * @return 分页结果
+     * 连表分页查询（带排序，白名单强校验）。
      */
-    default <D> PageResult<D> selectJoinPage(SortablePageParam pageParam, Class<D> clazz, MPJLambdaWrapper<T> lambdaWrapper) {
-        if (PageParam.PAGE_SIZE_NONE.equals(pageParam.getPageSize())) {
+    default <D> PageResult<D> selectJoinPage(SortablePageParam pageParam, Set<String> allowedFields,
+                                             Class<D> clazz, MPJLambdaWrapper<T> lambdaWrapper) {
+        List<SortField> sortFields = pageParam.parseSortFields(allowedFields);
+        if (!pageParam.isPaged()) {
             List<D> list = selectJoinList(clazz, lambdaWrapper);
-            return new PageResult<>(list, (long) list.size());
+            return PageResult.of(list, list.size(), list.size(), 1);
         }
-
-        IPage<D> mpPage = MyBatisUtils.buildPage(pageParam, pageParam.getSortingFields());
-        mpPage = selectJoinPage(mpPage, clazz, lambdaWrapper);
-        return new PageResult<>(mpPage.getRecords(), mpPage.getTotal());
+        Page<D> page = MyBatisPageUtils.toPage(pageParam);
+        MyBatisPageUtils.addOrder(page, sortFields);
+        IPage<D> result = selectJoinPage(page, clazz, lambdaWrapper);
+        return MyBatisPageUtils.toPageResult(result);
     }
 
     /**
-     * 通用连表分页查询（无排序）
+     * 通用连表分页查询（无排序）。
      *
-     * @param pageParam        分页参数
-     * @param resultTypeClass  返回结果类型
-     * @param joinQueryWrapper 连表查询包装器
-     * @param <DTO>            返回结果泛型
-     * @return 分页结果
+     * <p><b>修复：</b>原实现缺少 {@code !pageParam.isPaged()} 分支，
+     * 当 {@code pageSize = -1} 时会让 MP 生成非法 SQL。
      */
-    default <DTO> PageResult<DTO> selectJoinPage(PageParam pageParam, Class<DTO> resultTypeClass, MPJBaseJoin<T> joinQueryWrapper) {
-        IPage<DTO> mpPage = MyBatisUtils.buildPage(pageParam);
-        selectJoinPage(mpPage, resultTypeClass, joinQueryWrapper);
-        return new PageResult<>(mpPage.getRecords(), mpPage.getTotal());
+    default <DTO> PageResult<DTO> selectJoinPage(PageParam pageParam, Class<DTO> resultTypeClass,
+                                                 MPJBaseJoin<T> joinQueryWrapper) {
+        if (!pageParam.isPaged()) {
+            List<DTO> list = selectJoinList(resultTypeClass, joinQueryWrapper);
+            return PageResult.of(list, list.size(), list.size(), 1);
+        }
+        Page<DTO> page = MyBatisPageUtils.toPage(pageParam);
+        IPage<DTO> result = selectJoinPage(page, resultTypeClass, joinQueryWrapper);
+        return MyBatisPageUtils.toPageResult(result);
     }
 
-    // ==================== 单条记录查询（推荐使用 selectFirstOne） ====================
+    // ==================== 单条记录查询 ====================
 
     /**
-     * 根据条件查询单条记录（当有多条时抛出异常）
-     *
-     * @param field 字段名（字符串，存在 SQL 注入风险，请确保传入安全值）
-     * @param value 字段值
-     * @return 实体，若不存在返回 null
-     * @deprecated 存在 SQL 注入风险，建议使用 {@link #selectOne(SFunction, Object)} 或 {@link #selectFirstOne(SFunction, Object)}
+     * @deprecated 使用 String 作为字段名存在 SQL 注入风险（CWE-89）；请使用 {@link #selectOne(SFunction, Object)}
      */
-    @Deprecated
+    @Deprecated(since = "2026.08", forRemoval = true)
     default T selectOne(String field, Object value) {
         return selectOne(new QueryWrapper<T>().eq(field, value));
     }
 
-    /**
-     * 根据条件查询单条记录（推荐，使用 Lambda 表达式，安全）
-     *
-     * @param field 字段 Lambda 引用
-     * @param value 字段值
-     * @return 实体，若不存在返回 null
-     */
     default T selectOne(SFunction<T, ?> field, Object value) {
         return selectOne(new LambdaQueryWrapper<T>().eq(field, value));
     }
 
     /**
-     * 根据多个条件查询单条记录（字符串字段名，存在 SQL 注入风险）
-     *
-     * @deprecated 建议使用 Lambda 版本
+     * @deprecated 使用 String 作为字段名存在 SQL 注入风险；请使用 Lambda 版本
      */
-    @Deprecated
+    @Deprecated(since = "2026.08", forRemoval = true)
     default T selectOne(String field1, Object value1, String field2, Object value2) {
         return selectOne(new QueryWrapper<T>().eq(field1, value1).eq(field2, value2));
     }
 
-    /**
-     * 根据多个条件查询单条记录（Lambda 安全）
-     */
-    default T selectOne(SFunction<T, ?> field1, Object value1, SFunction<T, ?> field2, Object value2) {
+    default T selectOne(SFunction<T, ?> field1, Object value1,
+                        SFunction<T, ?> field2, Object value2) {
         return selectOne(new LambdaQueryWrapper<T>().eq(field1, value1).eq(field2, value2));
     }
 
-    /**
-     * 根据三个条件查询单条记录（Lambda 安全）
-     */
-    default T selectOne(SFunction<T, ?> field1, Object value1, SFunction<T, ?> field2, Object value2,
+    default T selectOne(SFunction<T, ?> field1, Object value1,
+                        SFunction<T, ?> field2, Object value2,
                         SFunction<T, ?> field3, Object value3) {
-        return selectOne(new LambdaQueryWrapper<T>().eq(field1, value1).eq(field2, value2).eq(field3, value3));
+        return selectOne(new LambdaQueryWrapper<T>()
+                .eq(field1, value1).eq(field2, value2).eq(field3, value3));
     }
 
-    // ==================== 获取第一条记录（性能优化版） ====================
+    // ==================== FOR UPDATE 查询 ====================
 
     /**
-     * 获取满足条件的第一条记录（使用分页限制，避免全表扫描）
+     * 获得满足条件的一条记录，并使用 {@code FOR UPDATE} 锁定。
      *
-     * <p>此方法利用 MyBatis Plus 分页插件自动适配不同数据库的 LIMIT/TOP/ROWNUM，
-     * 性能优于 {@code selectList} 全量查询后取第一条。
+     * <p><b>必须在外层事务中调用</b>，否则锁会在语句结束时立即释放。
      *
-     * @param wrapper 查询条件包装器
-     * @return 第一条记录，若无则返回 null
+     * <p><b>跨数据库兼容性：</b>本方法使用 {@code FOR UPDATE} 语法，
+     * <b>仅支持 MySQL / PostgreSQL / Oracle / 达梦 / 金仓</b>。
+     * SQL Server 不支持 {@code FOR UPDATE}，需在子接口中 override。
+     *
+     * @param queryWrapper 查询条件
+     * @return 实体，无匹配返回 {@code null}
      */
-    default T selectFirstOne(LambdaQueryWrapper<T> wrapper) {
-        Page<T> page = new Page<>(1, 1);
-        page.setSearchCount(false); // 不查询总记录数，提升性能
+    default T selectOneForUpdate(LambdaQueryWrapper<T> queryWrapper) {
+        return selectOne(queryWrapper.last("FOR UPDATE"));
+    }
+
+    default T selectOneForUpdate(SFunction<T, ?> field, Object value) {
+        return selectOneForUpdate(new LambdaQueryWrapper<T>().eq(field, value));
+    }
+
+    default T selectOneForUpdate(SFunction<T, ?> field1, Object value1,
+                                 SFunction<T, ?> field2, Object value2) {
+        return selectOneForUpdate(new LambdaQueryWrapper<T>()
+                .eq(field1, value1).eq(field2, value2));
+    }
+
+    default T selectOneForUpdate(SFunction<T, ?> field1, Object value1,
+                                 SFunction<T, ?> field2, Object value2,
+                                 SFunction<T, ?> field3, Object value3) {
+        return selectOneForUpdate(new LambdaQueryWrapper<T>()
+                .eq(field1, value1).eq(field2, value2).eq(field3, value3));
+    }
+
+    /**
+     * 获得满足条件的首条记录，并使用 {@code FOR UPDATE} 锁定。
+     *
+     * <p><b>必须在外层事务中调用</b>。
+     *
+     * <p><b>跨数据库兼容性：</b>本方法使用 {@code LIMIT 1 FOR UPDATE} 语法。
+     * <b>Oracle 与 SQL Server 不支持 {@code LIMIT}</b>，调用前需确认目标数据库类型。
+     * 推荐改用 {@link #selectOneForUpdate} 配合业务层去重。
+     *
+     * @param queryWrapper 查询条件
+     * @return 实体，无匹配返回 {@code null}
+     */
+    default T selectFirstForUpdate(LambdaQueryWrapper<T> queryWrapper) {
+        return selectOne(queryWrapper.last("LIMIT 1 FOR UPDATE"));
+    }
+
+    // ==================== 首条 / 末条查询 ====================
+
+    /**
+     * 获取满足条件的首条记录。
+     *
+     * <p><b>语义说明：</b>“首条”由底层 SQL 的执行计划决定，
+     * 若需确定性顺序，请在 wrapper 中显式 {@code orderByAsc(...)}。
+     *
+     * @param wrapper 查询条件
+     * @return 首条记录；不存在返回 {@code null}
+     */
+    default T selectFirst(Wrapper<T> wrapper) {
+        Page<T> page = new Page<>(1, FIRST_PAGE_SIZE);
+        page.setSearchCount(false); // 不查询总数，提升性能
         selectPage(page, wrapper);
         List<T> records = page.getRecords();
         return records.isEmpty() ? null : records.get(0);
     }
 
-    /**
-     * 根据单字段条件获取第一条记录
-     */
-    default T selectFirstOne(SFunction<T, ?> field, Object value) {
-        return selectFirstOne(new LambdaQueryWrapper<T>().eq(field, value));
+    default T selectFirst(LambdaQueryWrapper<T> wrapper) {
+        return selectFirst((Wrapper<T>) wrapper);
+    }
+
+    default T selectFirst(SFunction<T, ?> field, Object value) {
+        return selectFirst(new LambdaQueryWrapper<T>().eq(field, value));
+    }
+
+    default T selectFirst(SFunction<T, ?> field1, Object value1,
+                          SFunction<T, ?> field2, Object value2) {
+        return selectFirst(new LambdaQueryWrapper<T>().eq(field1, value1).eq(field2, value2));
+    }
+
+    default T selectFirst(SFunction<T, ?> field1, Object value1,
+                          SFunction<T, ?> field2, Object value2,
+                          SFunction<T, ?> field3, Object value3) {
+        return selectFirst(new LambdaQueryWrapper<T>()
+                .eq(field1, value1).eq(field2, value2).eq(field3, value3));
     }
 
     /**
-     * 根据两个字段条件获取第一条记录
+     * 获取满足条件的末条记录。
+     *
+     * <p><b>语义警告：</b>“末条”指查询结果列表的最后一项，
+     * <b>不是数据库中“最新”的一条</b>。若需“最新一条”，
+     * 请在 wrapper 中显式 {@code orderByDesc(创建时间)} 后再调用本方法。
+     *
+     * @param queryWrapper 查询条件（建议包含排序）
+     * @return 末条记录；不存在返回 {@code null}
      */
-    default T selectFirstOne(SFunction<T, ?> field1, Object value1, SFunction<T, ?> field2, Object value2) {
-        return selectFirstOne(new LambdaQueryWrapper<T>().eq(field1, value1).eq(field2, value2));
-    }
-
-    /**
-     * 根据三个字段条件获取第一条记录
-     */
-    default T selectFirstOne(SFunction<T, ?> field1, Object value1, SFunction<T, ?> field2, Object value2,
-                             SFunction<T, ?> field3, Object value3) {
-        return selectFirstOne(new LambdaQueryWrapper<T>().eq(field1, value1).eq(field2, value2).eq(field3, value3));
+    default T selectLast(LambdaQueryWrapper<T> queryWrapper) {
+        return CollUtil.getLast(selectList(queryWrapper));
     }
 
     // ==================== 总数查询 ====================
 
-    /**
-     * 查询总记录数（无条件）
-     */
     default Long selectCount() {
         return selectCount(new QueryWrapper<>());
     }
 
     /**
-     * 根据字段条件查询记录数（字符串字段名，存在 SQL 注入风险）
-     *
-     * @deprecated 建议使用 {@link #selectCount(SFunction, Object)} 版本
+     * @deprecated 使用 String 作为字段名存在 SQL 注入风险；请使用 Lambda 版本
      */
-    @Deprecated
+    @Deprecated(since = "2026.08", forRemoval = true)
     default Long selectCount(String field, Object value) {
         return selectCount(new QueryWrapper<T>().eq(field, value));
     }
 
-    /**
-     * 根据字段条件查询记录数（Lambda 安全）
-     */
     default Long selectCount(SFunction<T, ?> field, Object value) {
         return selectCount(new LambdaQueryWrapper<T>().eq(field, value));
     }
 
-    // ==================== 列表查询（空集合优化） ====================
+    // ==================== 列表查询 ====================
 
-    /**
-     * 查询全部记录
-     */
     default List<T> selectList() {
         return selectList(new QueryWrapper<>());
     }
 
     /**
-     * 根据字段条件查询列表（字符串字段名，存在 SQL 注入风险）
-     *
-     * @deprecated 建议使用 {@link #selectList(SFunction, Object)} 版本
+     * @deprecated 使用 String 作为字段名存在 SQL 注入风险；请使用 Lambda 版本
      */
-    @Deprecated
+    @Deprecated(since = "2026.08", forRemoval = true)
     default List<T> selectList(String field, Object value) {
         return selectList(new QueryWrapper<T>().eq(field, value));
     }
 
-    /**
-     * 根据字段条件查询列表（Lambda 安全）
-     */
     default List<T> selectList(SFunction<T, ?> field, Object value) {
         return selectList(new LambdaQueryWrapper<T>().eq(field, value));
     }
 
     /**
-     * 根据字段 IN 条件查询列表（字符串字段名，存在 SQL 注入风险）
-     *
-     * @deprecated 建议使用 {@link #selectList(SFunction, Collection)} 版本
+     * @deprecated 使用 String 作为字段名存在 SQL 注入风险；请使用 Lambda 版本
      */
-    @Deprecated
+    @Deprecated(since = "2026.08", forRemoval = true)
     default List<T> selectList(String field, Collection<?> values) {
         if (CollUtil.isEmpty(values)) {
-            return Collections.emptyList(); // 避免无效查询，直接返回空列表
+            return Collections.emptyList();
         }
         return selectList(new QueryWrapper<T>().in(field, values));
     }
 
-    /**
-     * 根据字段 IN 条件查询列表（Lambda 安全）
-     */
     default List<T> selectList(SFunction<T, ?> field, Collection<?> values) {
         if (CollUtil.isEmpty(values)) {
             return Collections.emptyList();
@@ -313,114 +333,93 @@ public interface BaseMapperX<T> extends MPJBaseMapper<T> {
         return selectList(new LambdaQueryWrapper<T>().in(field, values));
     }
 
-    /**
-     * 根据两个字段条件查询列表（Lambda 安全）
-     */
-    default List<T> selectList(SFunction<T, ?> field1, Object value1, SFunction<T, ?> field2, Object value2) {
-        return selectList(new LambdaQueryWrapper<T>().eq(field1, value1).eq(field2, value2));
+    default List<T> selectList(SFunction<T, ?> field1, Object value1,
+                               SFunction<T, ?> field2, Object value2) {
+        return selectList(new LambdaQueryWrapper<T>()
+                .eq(field1, value1).eq(field2, value2));
     }
 
     // ==================== 批量操作 ====================
 
     /**
-     * 批量插入（适用于大量数据）
+     * 批量插入（使用默认批次大小 1000）。
      *
-     * <p><b>注意：</b> SQL Server 因 JDBC 驱动限制，批量插入后无法自动获取生成的主键，
-     * 因此采用循环插入。如需高性能，可考虑使用 {@code SqlSession} 的 BATCH 执行器。
+     * <p><b>注意：</b>若使用 SQL Server，批量插入后无法自动回填自增主键。
+     * 如业务依赖主键回填，请在子接口中 override 本方法。
      *
      * @param entities 实体集合
-     * @return true 表示至少有一条插入成功（存在数据），false 表示无数据或全部失败
+     * @return {@code true} 表示有实体被处理；{@code false} 表示入参为空
      */
-    default Boolean insertBatch(Collection<T> entities) {
+    default boolean insertBatch(Collection<T> entities) {
         if (CollUtil.isEmpty(entities)) {
             return false;
-        }
-        DbType dbType = JdbcUtils.getDbType();
-        if (JdbcUtils.isSQLServer(dbType)) {
-            entities.forEach(this::insert);
-            return true;
         }
         return Db.saveBatch(entities);
     }
 
     /**
-     * 批量插入（指定批量大小）
+     * 批量插入（指定批次大小）。
      *
      * @param entities 实体集合
-     * @param size     每批插入的数量（Db.saveBatch 默认为 1000）
-     * @return true 表示至少有一条插入成功
+     * @param size     每批插入数量
+     * @return {@code true} 表示有实体被处理；{@code false} 表示入参为空
      */
-    default Boolean insertBatch(Collection<T> entities, int size) {
+    default boolean insertBatch(Collection<T> entities, int size) {
         if (CollUtil.isEmpty(entities)) {
             return false;
-        }
-        DbType dbType = JdbcUtils.getDbType();
-        if (JdbcUtils.isSQLServer(dbType)) {
-            entities.forEach(this::insert);
-            return true;
         }
         return Db.saveBatch(entities, size);
     }
 
     /**
-     * 批量更新（使用主键）
+     * 批量更新（按主键）。
      *
      * @param entities 实体集合（必须包含主键）
-     * @return true 表示至少有一条更新成功，false 表示无数据或全部失败
+     * @return {@code true} 表示有实体被处理；{@code false} 表示入参为空
      */
-    default Boolean updateBatch(Collection<T> entities) {
+    default boolean updateBatch(Collection<T> entities) {
+        if (CollUtil.isEmpty(entities)) {
+            return false;
+        }
         return Db.updateBatchById(entities);
     }
 
     /**
-     * 批量更新（指定批量大小）
+     * 批量更新（按主键，指定批次大小）。
      *
-     * @param entities 实体集合
-     * @param size     每批更新的数量
-     * @return true 表示至少有一条更新成功
+     * @see #updateBatch(Collection)
      */
-    default Boolean updateBatch(Collection<T> entities, int size) {
+    default boolean updateBatch(Collection<T> entities, int size) {
+        if (CollUtil.isEmpty(entities)) {
+            return false;
+        }
         return Db.updateBatchById(entities, size);
     }
 
     /**
-     * 全量更新（无条件，危险操作）
+     * 全量更新（无条件）。
      *
-     * @param update 更新的实体（非空字段作为更新内容）
-     * @return 影响行数
+     * @deprecated 无条件更新风险极高，请使用带条件的 {@code update(entity, wrapper)}
      */
+    @Deprecated(since = "2026.08", forRemoval = true)
     default int updateBatch(T update) {
         return update(update, new QueryWrapper<>());
     }
 
+    // ==================== 删除操作 ====================
+
     /**
-     * 根据字段条件删除（字符串字段名，存在 SQL 注入风险）
-     *
-     * @deprecated 建议使用 {@link #delete(SFunction, Object)} 版本
+     * @deprecated 使用 String 作为字段名存在 SQL 注入风险；请使用 {@link #delete(SFunction, Object)}
      */
-    @Deprecated
-    default int delete(String field, String value) {
+    @Deprecated(since = "2026.08", forRemoval = true)
+    default int delete(String field, Object value) {
         return delete(new QueryWrapper<T>().eq(field, value));
     }
 
-    /**
-     * 根据字段条件删除（Lambda 安全）
-     *
-     * @param field 字段 Lambda 引用
-     * @param value 字段值
-     * @return 删除的记录数
-     */
     default int delete(SFunction<T, ?> field, Object value) {
         return delete(new LambdaQueryWrapper<T>().eq(field, value));
     }
 
-    /**
-     * 根据字段 IN 条件批量删除（Lambda 安全）
-     *
-     * @param field  字段 Lambda 引用
-     * @param values 值集合
-     * @return 删除的记录数
-     */
     default int deleteBatch(SFunction<T, ?> field, Collection<?> values) {
         if (CollUtil.isEmpty(values)) {
             return 0;

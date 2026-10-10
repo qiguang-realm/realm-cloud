@@ -2,89 +2,114 @@ package cn.realm.cloud.framework.common.util.file;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
+import java.util.Objects;
 
 /**
- * 专注格式转换
- * <p>
- * 基于 Apache Commons IO + Google Guava 构建，提供 byte[]、File、InputStream、
- * OutputStream、MultipartFile 之间的统一转换能力。
- * </p>
+ * 文件格式转换工具类。
  *
- * <p><b>核心设计原则：</b></p>
- * <ul>
- *   <li>以 byte[] 为数据核心（最底层、最通用、最安全）</li>
- *   <li>所有转换方法命名统一：toXxx() 表示转换为 Xxx 类型</li>
- *   <li>支持链式调用和批量操作</li>
- *   <li>自动管理资源（try-with-resources）</li>
- * </ul>
+ * <p><b>能力：</b>提供 {@code byte[]}、{@link File}、{@link InputStream}、
+ * {@link OutputStream}、{@link MultipartFile} 之间的统一转换，
+ * 以及常用的文件操作（复制、读写、删除、类型判断）。
+ *
+ * <p><b>核心设计原则：</b>
+ * <ol>
+ *     <li>以 {@code byte[]} 为数据核心（最底层、最通用）</li>
+ *     <li>所有转换方法命名统一：{@code toXxx()} 表示转换为 {@code Xxx} 类型</li>
+ *     <li><b>不关闭调用方传入的流</b>：遵循"谁打开，谁关闭"原则（Effective Java Item 9）</li>
+ *     <li>输入参数校验使用 {@link Objects#requireNonNull}，异常消息统一</li>
+ * </ol>
+ *
+ * <p><b>内容类型识别：</b>使用 Spring 的 {@link MediaTypeFactory}，
+ * 内置 500+ 扩展名映射，覆盖常见文件格式。
+ *
+ * <p><b>线程安全：</b>本类所有方法均为无状态设计，线程安全。
+ *
+ * <p><b>使用示例：</b>
+ * <pre>{@code
+ * // 读取文件
+ * byte[] bytes = FileConvertUtil.toBytes(new File("a.txt"));
+ *
+ * // 输入流 → byte[]（调用方负责关闭 inputStream）
+ * try (InputStream is = new FileInputStream("a.txt")) {
+ *     byte[] data = FileConvertUtil.toBytes(is);
+ * }
+ *
+ * // 写文件
+ * FileConvertUtil.toFile(bytes, new File("b.txt"));
+ *
+ * // 转 MultipartFile
+ * MultipartFile mf = FileConvertUtil.toMultipartFile(bytes, "file", "a.txt", "text/plain");
+ * }</pre>
  *
  * @author QI Guang
- * @version 2.0.0
  * @since 1.0.0
  */
-@SuppressWarnings({"unused", "WeakerAccess"})
 public final class FileConvertUtil {
 
-    private static final int DEFAULT_BUFFER_SIZE = 8192;
-
     private FileConvertUtil() {
+        throw new UnsupportedOperationException(
+                "FileConvertUtil is a static utility class and cannot be instantiated");
     }
 
     // ================================================================
-    // 📥 转换为 byte[]
+    // 转换为 byte[]
     // ================================================================
 
+    /**
+     * 读取文件为字节数组。
+     *
+     * @param file 目标文件，不允许为 {@code null}
+     * @throws IOException 文件不存在或读取失败时抛出
+     */
     public static byte[] toBytes(File file) throws IOException {
-        if (file == null) {
-            throw new IllegalArgumentException("File 不能为 null");
-        }
+        Objects.requireNonNull(file, "file must not be null");
         if (!file.exists()) {
-            throw new FileNotFoundException("文件不存在: " + file.getAbsolutePath());
+            throw new FileNotFoundException("File not found: " + file.getAbsolutePath());
         }
         return FileUtils.readFileToByteArray(file);
     }
 
+    /**
+     * 从输入流读取字节数组。
+     *
+     * <p><b>注意：</b>本方法<b>不关闭</b> {@code inputStream}，由调用方负责关闭。
+     *
+     * @param inputStream 输入流，不允许为 {@code null}
+     * @throws IOException 读取失败时抛出
+     */
     public static byte[] toBytes(InputStream inputStream) throws IOException {
-        if (inputStream == null) {
-            throw new IllegalArgumentException("InputStream 不能为 null");
-        }
-        try (InputStream is = inputStream) {
-            return IOUtils.toByteArray(is);
-        }
+        Objects.requireNonNull(inputStream, "inputStream must not be null");
+        return inputStream.readAllBytes();
     }
 
+    /**
+     * 从 {@link MultipartFile} 读取字节数组。
+     *
+     * @param multipartFile 上传文件，不允许为 {@code null}
+     * @throws IOException 读取失败时抛出
+     */
     public static byte[] toBytes(MultipartFile multipartFile) throws IOException {
-        if (multipartFile == null) {
-            throw new IllegalArgumentException("MultipartFile 不能为 null");
-        }
+        Objects.requireNonNull(multipartFile, "multipartFile must not be null");
         if (multipartFile.isEmpty()) {
             return new byte[0];
         }
         return multipartFile.getBytes();
     }
 
-    public static byte[] toBytes(Reader reader) throws IOException {
-        if (reader == null) {
-            throw new IllegalArgumentException("Reader 不能为 null");
-        }
-        try (Reader r = reader) {
-            char[] buffer = new char[DEFAULT_BUFFER_SIZE];
-            StringBuilder sb = new StringBuilder();
-            int len;
-            while ((len = r.read(buffer)) != -1) {
-                sb.append(buffer, 0, len);
-            }
-            return sb.toString().getBytes(StandardCharsets.UTF_8);
-        }
-    }
-
+    /**
+     * 将字符串按 UTF-8 编码转为字节数组。
+     *
+     * @param content 字符串；为 {@code null} 时返回空数组
+     */
     public static byte[] toBytes(String content) {
         if (content == null) {
             return new byte[0];
@@ -93,233 +118,217 @@ public final class FileConvertUtil {
     }
 
     // ================================================================
-    // 📄 转换为 File
+    // 转换为 File
     // ================================================================
 
+    /**
+     * 将字节数组写入文件（自动创建父目录）。
+     */
     public static void toFile(byte[] bytes, File file) throws IOException {
-        if (bytes == null) {
-            throw new IllegalArgumentException("byte[] 不能为 null");
-        }
-        if (file == null) {
-            throw new IllegalArgumentException("File 不能为 null");
-        }
-        File parent = file.getParentFile();
-        if (parent != null && !parent.exists()) {
-            FileUtils.forceMkdir(parent);
-        }
+        Objects.requireNonNull(bytes, "bytes must not be null");
+        Objects.requireNonNull(file, "file must not be null");
+        forceMkdirs(file);
         FileUtils.writeByteArrayToFile(file, bytes);
     }
 
+    /**
+     * 将输入流写入文件（自动创建父目录）。
+     *
+     * <p><b>注意：</b>本方法<b>不关闭</b> {@code inputStream}，由调用方负责关闭。
+     */
     public static void toFile(InputStream inputStream, File file) throws IOException {
-        if (inputStream == null) {
-            throw new IllegalArgumentException("InputStream 不能为 null");
+        Objects.requireNonNull(inputStream, "inputStream must not be null");
+        Objects.requireNonNull(file, "file must not be null");
+        forceMkdirs(file);
+        try (OutputStream out = Files.newOutputStream(file.toPath())) {
+            inputStream.transferTo(out);
         }
-        if (file == null) {
-            throw new IllegalArgumentException("File 不能为 null");
-        }
-        File parent = file.getParentFile();
-        if (parent != null && !parent.exists()) {
-            FileUtils.forceMkdir(parent);
-        }
-        try (InputStream is = inputStream) {
-            FileUtils.copyInputStreamToFile(is, file);
-        }
-    }
-
-    public static void toFile(String content, File file) throws IOException {
-        if (content == null) {
-            throw new IllegalArgumentException("content 不能为 null");
-        }
-        toFile(content.getBytes(StandardCharsets.UTF_8), file);
     }
 
     /**
-     * 将字节数组写入临时文件（使用系统临时目录）
-     * <p>文件会在 JVM 退出时自动删除（deleteOnExit）</p>
+     * 将字符串按 UTF-8 写入文件（自动创建父目录）。
+     */
+    public static void toFile(String content, File file) throws IOException {
+        Objects.requireNonNull(file, "file must not be null");
+        toFile(toBytes(content), file);
+    }
+
+    /**
+     * 将字节数组写入临时文件。
      *
-     * @param bytes  字节数组
-     * @param prefix 文件名前缀
-     * @param suffix 文件名后缀（如 ".pdf"）
-     * @return 临时文件对象
+     * <p>临时文件位于系统临时目录，通过 {@link File#deleteOnExit()} 在 JVM 退出时清理。
+     *
+     * @param bytes  字节数组，不允许为空
+     * @param prefix 文件名前缀（默认 {@code "file_"}）
+     * @param suffix 文件名后缀（默认 {@code ".tmp"}）
      */
     public static File toTempFile(byte[] bytes, String prefix, String suffix) throws IOException {
-        if (bytes == null || bytes.length == 0) {
-            throw new IllegalArgumentException("字节数组不能为空");
+        Objects.requireNonNull(bytes, "bytes must not be null");
+        if (bytes.length == 0) {
+            throw new IllegalArgumentException("bytes must not be empty");
         }
-        String ext = (suffix != null && suffix.startsWith(".")) ? suffix : (suffix != null ? "." + suffix : ".tmp");
-        String fileName = (prefix != null ? prefix : "file_") + System.currentTimeMillis() + ext;
-        File tempFile = File.createTempFile(prefix != null ? prefix : "file_", ext);
-        tempFile.deleteOnExit();
+        File tempFile = createTempFile(prefix, suffix);
         toFile(bytes, tempFile);
         return tempFile;
     }
 
-    public static File toTempFile(InputStream inputStream, String prefix, String suffix) throws IOException {
-        if (inputStream == null) {
-            throw new IllegalArgumentException("InputStream 不能为 null");
-        }
-        String ext = (suffix != null && suffix.startsWith(".")) ? suffix : (suffix != null ? "." + suffix : ".tmp");
-        File tempFile = File.createTempFile(prefix != null ? prefix : "file_", ext);
-        tempFile.deleteOnExit();
+    /**
+     * 将输入流写入临时文件。
+     *
+     * <p><b>注意：</b>本方法<b>不关闭</b> {@code inputStream}。
+     */
+    public static File toTempFile(InputStream inputStream, String prefix, String suffix)
+            throws IOException {
+        Objects.requireNonNull(inputStream, "inputStream must not be null");
+        File tempFile = createTempFile(prefix, suffix);
         toFile(inputStream, tempFile);
         return tempFile;
     }
 
     // ================================================================
-    // 📤 转换为 InputStream
+    // 转换为 InputStream
     // ================================================================
 
+    /**
+     * 将字节数组包装为 {@link ByteArrayInputStream}。
+     *
+     * @param bytes 字节数组；为 {@code null} 时返回空输入流
+     */
     public static InputStream toInputStream(byte[] bytes) {
-        if (bytes == null) {
-            return new ByteArrayInputStream(new byte[0]);
-        }
-        return new ByteArrayInputStream(bytes);
+        return new ByteArrayInputStream(bytes != null ? bytes : new byte[0]);
     }
 
+    /**
+     * 打开文件输入流。
+     *
+     * <p><b>注意：</b>调用方负责关闭返回的流。
+     */
     public static InputStream toInputStream(File file) throws IOException {
-        if (file == null) {
-            throw new IllegalArgumentException("File 不能为 null");
-        }
+        Objects.requireNonNull(file, "file must not be null");
         if (!file.exists()) {
-            throw new FileNotFoundException("文件不存在: " + file.getAbsolutePath());
+            throw new FileNotFoundException("File not found: " + file.getAbsolutePath());
         }
         return new FileInputStream(file);
     }
 
+    /**
+     * 将字符串按 UTF-8 编码包装为 {@link ByteArrayInputStream}。
+     */
     public static InputStream toInputStream(String content) {
-        if (content == null) {
-            return new ByteArrayInputStream(new byte[0]);
-        }
-        return new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+        return toInputStream(toBytes(content));
     }
 
     // ================================================================
-    // 🌐 转换为 MultipartFile
+    // 转换为 MultipartFile
     // ================================================================
 
+    /**
+     * 将字节数组包装为 {@link MultipartFile}。
+     *
+     * <p><b>默认值：</b>{@code name="file"}、{@code originalFilename="file.bin"}、
+     * {@code contentType="application/octet-stream"}。
+     */
     public static MultipartFile toMultipartFile(byte[] bytes, String name,
                                                 String originalFilename, String contentType) {
-        if (bytes == null) {
-            bytes = new byte[0];
-        }
         return new ByteArrayMultipartFile(
-                bytes,
+                bytes != null ? bytes : new byte[0],
                 name != null ? name : "file",
                 originalFilename != null ? originalFilename : "file.bin",
-                contentType != null ? contentType : "application/octet-stream"
-        );
+                contentType != null ? contentType : MediaType.APPLICATION_OCTET_STREAM_VALUE);
     }
 
+    /**
+     * 将文件包装为 {@link MultipartFile}。
+     */
     public static MultipartFile toMultipartFile(File file, String name) throws IOException {
-        if (file == null) {
-            throw new IllegalArgumentException("File 不能为 null");
-        }
+        Objects.requireNonNull(file, "file must not be null");
         if (!file.exists()) {
-            throw new FileNotFoundException("文件不存在: " + file.getAbsolutePath());
+            throw new FileNotFoundException("File not found: " + file.getAbsolutePath());
         }
         if (!file.isFile()) {
-            throw new IllegalArgumentException("路径不是文件: " + file.getAbsolutePath());
+            throw new IllegalArgumentException("Not a regular file: " + file.getAbsolutePath());
         }
-        byte[] bytes = toBytes(file);
-        String fileName = file.getName();
-        String contentType = Files.probeContentType(file.toPath());
-        if (contentType == null) {
-            contentType = getContentType(fileName);
-        }
-        return toMultipartFile(bytes, name, fileName, contentType);
+        return toMultipartFile(
+                toBytes(file),
+                name,
+                file.getName(),
+                getContentType(file.getName()));
     }
 
+    /**
+     * 将文件包装为 {@link MultipartFile}（{@code name} 默认 {@code "file"}）。
+     */
     public static MultipartFile toMultipartFile(File file) throws IOException {
         return toMultipartFile(file, null);
     }
 
-    public static MultipartFile copyMultipartFile(MultipartFile multipartFile, String newName) throws IOException {
-        if (multipartFile == null) {
-            throw new IllegalArgumentException("MultipartFile 不能为 null");
-        }
-        byte[] bytes = toBytes(multipartFile);
+    /**
+     * 复制 {@link MultipartFile}，可指定新的 {@code name}。
+     */
+    public static MultipartFile copyMultipartFile(MultipartFile multipartFile, String newName)
+            throws IOException {
+        Objects.requireNonNull(multipartFile, "multipartFile must not be null");
         return toMultipartFile(
-                bytes,
+                toBytes(multipartFile),
                 newName != null ? newName : multipartFile.getName(),
                 multipartFile.getOriginalFilename(),
-                multipartFile.getContentType()
-        );
+                multipartFile.getContentType());
     }
 
     // ================================================================
-    // 📋 文件操作工具方法
+    // 文件操作
     // ================================================================
 
+    /**
+     * 复制文件（自动创建目标父目录）。
+     */
     public static void copy(File source, File target) throws IOException {
-        if (source == null || target == null) {
-            throw new IllegalArgumentException("源文件或目标文件不能为 null");
-        }
+        Objects.requireNonNull(source, "source must not be null");
+        Objects.requireNonNull(target, "target must not be null");
         if (!source.exists()) {
-            throw new FileNotFoundException("源文件不存在: " + source.getAbsolutePath());
+            throw new FileNotFoundException("Source not found: " + source.getAbsolutePath());
         }
-        FileUtils.copyFile(source, target);
+        forceMkdirs(target);
+        Files.copy(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
     }
 
-    public static void copyNio(File source, File target) throws IOException {
-        if (source == null || target == null) {
-            throw new IllegalArgumentException("源文件或目标文件不能为 null");
-        }
-        if (!source.exists()) {
-            throw new FileNotFoundException("源文件不存在: " + source.getAbsolutePath());
-        }
-        File parent = target.getParentFile();
-        if (parent != null && !parent.exists()) {
-            FileUtils.forceMkdir(parent);
-        }
-        Path sourcePath = source.toPath();
-        Path targetPath = target.toPath();
-        Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
-    }
-
+    /**
+     * 从输入流复制到输出流。
+     *
+     * <p><b>注意：</b>本方法<b>不关闭</b>任何流，由调用方负责关闭。
+     *
+     * @return 复制的字节数
+     */
     public static long copy(InputStream input, OutputStream output) throws IOException {
-        if (input == null || output == null) {
-            throw new IllegalArgumentException("输入流或输出流不能为 null");
-        }
-        try (InputStream is = input; OutputStream os = output) {
-            return IOUtils.copyLarge(is, os);
-        }
+        Objects.requireNonNull(input, "input must not be null");
+        Objects.requireNonNull(output, "output must not be null");
+        return IOUtils.copyLarge(input, output);
     }
 
-    public static java.util.List<String> readLines(File file) throws IOException {
-        if (file == null) {
-            throw new IllegalArgumentException("File 不能为 null");
-        }
+    /**
+     * 按行读取文件（UTF-8 编码）。
+     */
+    public static List<String> readLines(File file) throws IOException {
+        Objects.requireNonNull(file, "file must not be null");
         if (!file.exists()) {
-            throw new FileNotFoundException("文件不存在: " + file.getAbsolutePath());
+            throw new FileNotFoundException("File not found: " + file.getAbsolutePath());
         }
         return FileUtils.readLines(file, StandardCharsets.UTF_8);
     }
 
+    /**
+     * 将字符串按 UTF-8 写入文件（自动创建父目录）。
+     */
     public static void writeString(File file, String content) throws IOException {
-        if (file == null) {
-            throw new IllegalArgumentException("File 不能为 null");
-        }
-        if (content == null) {
-            content = "";
-        }
-        File parent = file.getParentFile();
-        if (parent != null && !parent.exists()) {
-            FileUtils.forceMkdir(parent);
-        }
-        FileUtils.writeStringToFile(file, content, StandardCharsets.UTF_8);
+        Objects.requireNonNull(file, "file must not be null");
+        forceMkdirs(file);
+        FileUtils.writeStringToFile(file, content != null ? content : "",
+                StandardCharsets.UTF_8);
     }
 
-    public static long size(File file) {
-        if (file == null || !file.exists()) {
-            return 0;
-        }
-        return file.length();
-    }
-
-    public static boolean exists(File file) {
-        return file != null && file.exists();
-    }
-
+    /**
+     * 删除文件或目录（静默，失败返回 {@code false}）。
+     */
     public static boolean delete(File file) {
         if (file == null || !file.exists()) {
             return false;
@@ -327,13 +336,20 @@ public final class FileConvertUtil {
         return FileUtils.deleteQuietly(file);
     }
 
+    // ================================================================
+    // 扩展名与内容类型
+    // ================================================================
+
+    /**
+     * 获取文件扩展名（小写，不含 {@code .}）。
+     */
     public static String getExtension(File file) {
-        if (file == null) {
-            return "";
-        }
-        return getExtension(file.getName());
+        return file == null ? "" : getExtension(file.getName());
     }
 
+    /**
+     * 获取文件扩展名（小写，不含 {@code .}）。
+     */
     public static String getExtension(String fileName) {
         if (fileName == null || fileName.isEmpty()) {
             return "";
@@ -345,101 +361,92 @@ public final class FileConvertUtil {
         return "";
     }
 
-    // ================================================================
-    // 💡 便捷工具方法
-    // ================================================================
+    /**
+     * 根据文件名获取 MIME 类型。
+     *
+     * <p>使用 Spring 的 {@link MediaTypeFactory}，内置 500+ 扩展名映射。
+     * 无法识别时返回 {@code application/octet-stream}。
+     */
+    public static String getContentType(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        }
+        return MediaTypeFactory.getMediaType(fileName)
+                .map(MediaType::toString)
+                .orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE);
+    }
 
+    /**
+     * 判断文件是否为图片（基于 MIME 类型）。
+     */
     public static boolean isImage(File file) {
-        if (file == null) {
+        if (file == null || !file.exists()) {
             return false;
         }
-        String ext = getExtension(file);
-        return "jpg".equals(ext) || "jpeg".equals(ext) ||
-                "png".equals(ext) || "gif".equals(ext) ||
-                "bmp".equals(ext) || "webp".equals(ext) ||
-                "svg".equals(ext);
+        return getContentType(file.getName()).startsWith("image/");
     }
 
+    /**
+     * 判断文件是否为 PDF（基于 MIME 类型）。
+     */
     public static boolean isPdf(File file) {
-        if (file == null) {
+        if (file == null || !file.exists()) {
             return false;
         }
-        String ext = getExtension(file);
-        return "pdf".equalsIgnoreCase(ext);
+        return MediaType.APPLICATION_PDF_VALUE.equals(getContentType(file.getName()));
     }
 
+    /**
+     * 判断文件是否为空（不存在或长度为 0）。
+     */
     public static boolean isEmpty(File file) {
         return file == null || !file.exists() || file.length() == 0;
     }
 
-    public static String getFileName(File file) {
-        return file == null ? "" : file.getName();
+    // ================================================================
+    // 私有辅助方法
+    // ================================================================
+
+    /**
+     * 创建临时文件并注册 JVM 退出时删除。
+     */
+    private static File createTempFile(String prefix, String suffix) throws IOException {
+        String normalizedPrefix = (prefix != null && !prefix.isEmpty()) ? prefix : "file_";
+        String normalizedSuffix = normalizeSuffix(suffix);
+        File tempFile = File.createTempFile(normalizedPrefix, normalizedSuffix);
+        tempFile.deleteOnExit();
+        return tempFile;
     }
 
     /**
-     * 根据文件名获取 Content-Type（MIME 类型）
-     *
-     * @param fileName 文件名
-     * @return MIME 类型
+     * 规范化后缀（确保以 {@code .} 开头）。
      */
-    public static String getContentType(String fileName) {
-        if (fileName == null || fileName.isEmpty()) {
-            return "application/octet-stream";
+    private static String normalizeSuffix(String suffix) {
+        if (suffix == null || suffix.isEmpty()) {
+            return ".tmp";
         }
-        String lower = fileName.toLowerCase();
-        if (lower.endsWith(".pdf")) {
-            return "application/pdf";
-        } else if (lower.endsWith(".docx")) {
-            return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-        } else if (lower.endsWith(".doc")) {
-            return "application/msword";
-        } else if (lower.endsWith(".xlsx")) {
-            return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-        } else if (lower.endsWith(".xls")) {
-            return "application/vnd.ms-excel";
-        } else if (lower.endsWith(".pptx")) {
-            return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-        } else if (lower.endsWith(".ppt")) {
-            return "application/vnd.ms-powerpoint";
-        } else if (lower.endsWith(".png")) {
-            return "image/png";
-        } else if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
-            return "image/jpeg";
-        } else if (lower.endsWith(".gif")) {
-            return "image/gif";
-        } else if (lower.endsWith(".bmp")) {
-            return "image/bmp";
-        } else if (lower.endsWith(".webp")) {
-            return "image/webp";
-        } else if (lower.endsWith(".svg")) {
-            return "image/svg+xml";
-        } else if (lower.endsWith(".txt")) {
-            return "text/plain";
-        } else if (lower.endsWith(".json")) {
-            return "application/json";
-        } else if (lower.endsWith(".xml")) {
-            return "application/xml";
-        } else if (lower.endsWith(".zip")) {
-            return "application/zip";
-        } else if (lower.endsWith(".rar")) {
-            return "application/x-rar-compressed";
-        } else if (lower.endsWith(".7z")) {
-            return "application/x-7z-compressed";
-        } else if (lower.endsWith(".mp4")) {
-            return "video/mp4";
-        } else if (lower.endsWith(".mp3")) {
-            return "audio/mpeg";
-        } else if (lower.endsWith(".wav")) {
-            return "audio/wav";
-        } else {
-            return "application/octet-stream";
+        return suffix.startsWith(".") ? suffix : "." + suffix;
+    }
+
+    /**
+     * 确保目标文件的父目录存在。
+     */
+    private static void forceMkdirs(File file) throws IOException {
+        File parent = file.getParentFile();
+        if (parent != null && !parent.exists()) {
+            FileUtils.forceMkdir(parent);
         }
     }
 
     // ================================================================
-    // 🔧 私有内部类：MultipartFile 自定义实现
+    // 内部类：MultipartFile 实现
     // ================================================================
 
+    /**
+     * 基于 {@code byte[]} 的 {@link MultipartFile} 实现。
+     *
+     * <p>适用于内存中构建上传文件，无需落盘。
+     */
     private static final class ByteArrayMultipartFile implements MultipartFile {
 
         private final byte[] content;
@@ -447,9 +454,9 @@ public final class FileConvertUtil {
         private final String originalFilename;
         private final String contentType;
 
-        private ByteArrayMultipartFile(byte[] content, String name,
-                                       String originalFilename, String contentType) {
-            this.content = content != null ? content : new byte[0];
+        ByteArrayMultipartFile(byte[] content, String name,
+                               String originalFilename, String contentType) {
+            this.content = content;
             this.name = name;
             this.originalFilename = originalFilename;
             this.contentType = contentType;
@@ -482,7 +489,7 @@ public final class FileConvertUtil {
 
         @Override
         public byte[] getBytes() {
-            return content.clone();
+            return content;
         }
 
         @Override
@@ -492,9 +499,7 @@ public final class FileConvertUtil {
 
         @Override
         public void transferTo(File dest) throws IOException {
-            if (dest == null) {
-                throw new IllegalArgumentException("目标文件不能为 null");
-            }
+            Objects.requireNonNull(dest, "dest must not be null");
             toFile(content, dest);
         }
     }

@@ -1,59 +1,61 @@
 package cn.realm.cloud.framework.common.core;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.Objects;
 
 /**
- * 键值对（Key-Value）对象，用于存储一对关联的键和值。
+ * 不可变键值对，用于存储一对关联的键与值。
  *
- * <p>该类是不可变的，所有字段均为 {@code final}，线程安全。
- * 提供静态工厂方法 {@link #of(Object, Object)} 创建实例，同时也提供无参构造器以支持序列化框架（如 Jackson）。
+ * <p>本类为 {@code final}，所有字段为 {@code final}，线程安全。
+ * 反序列化通过 {@link #KeyValue(Object, Object)} 全参构造器完成
+ * （Jackson 2.12+ 支持无参构造器缺失场景下的多参构造器绑定，无需无参构造器）。
+ *
+ * <p><b>命名说明：</b>本类与 JDK 的 {@link java.util.Map.Entry} 语义相近但用途不同：
+ * {@code Map.Entry} 是 Map 的视图，生命周期与 Map 绑定；
+ * {@code KeyValue} 是独立的值对象，可自由传递、存储、序列化。
  *
  * @param <K> 键的类型
  * @param <V> 值的类型
  * @author QI Guang
  */
-public class KeyValue<K, V> implements Serializable {
+public final class KeyValue<K, V> implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private final K key;
     private final V value;
 
-    /**
-     * 无参构造器（供序列化框架使用，不推荐业务代码直接调用）。
-     * 为 final 字段赋予默认值 null。
-     */
-    public KeyValue() {
-        this.key = null;
-        this.value = null;
-    }
+    // ==================== 构造器 ====================
 
     /**
-     * 全参构造器，创建包含指定键和值的 KeyValue 实例。
+     * 全参构造器。
      *
-     * @param key   键（可为 null）
-     * @param value 值（可为 null）
+     * <p><b>注意：</b>本类不提供无参构造器，因为：
+     * <ol>
+     *     <li>无参构造器会为 {@code final} 字段赋 {@code null}，产生"半成品"对象；</li>
+     *     <li>Jackson 2.12+ 支持通过多参构造器反序列化，无需无参构造器。</li>
+     * </ol>
+     *
+     * @param key   键（可为 {@code null}）
+     * @param value 值（可为 {@code null}）
      */
     public KeyValue(K key, V value) {
         this.key = key;
         this.value = value;
     }
 
+    // ==================== 静态工厂 ====================
+
     /**
-     * 静态工厂方法，创建 KeyValue 实例。
-     *
-     * @param key   键
-     * @param value 值
-     * @param <K>   键类型
-     * @param <V>   值类型
-     * @return KeyValue 实例
+     * 创建 {@link KeyValue} 实例。
      */
     public static <K, V> KeyValue<K, V> of(K key, V value) {
         return new KeyValue<>(key, value);
     }
 
-    // ==================== Getters ====================
+    // ==================== 访问器 ====================
 
     public K getKey() {
         return key;
@@ -63,13 +65,23 @@ public class KeyValue<K, V> implements Serializable {
         return value;
     }
 
-    // ==================== Object 方法重写 ====================
+    // ==================== Object 方法 ====================
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>使用 {@code instanceof} 判断类型（而非 {@code getClass()}），
+     * 以保证 Liskov 替换原则。由于本类为 {@code final}，此处理论上无子类，
+     * 但仍保持规范写法，便于未来扩展。
+     */
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        KeyValue<?, ?> that = (KeyValue<?, ?>) o;
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof KeyValue<?, ?> that)) {
+            return false;
+        }
         return Objects.equals(key, that.key) && Objects.equals(value, that.value);
     }
 
@@ -80,9 +92,6 @@ public class KeyValue<K, V> implements Serializable {
 
     @Override
     public String toString() {
-        return "KeyValue{" +
-                "key=" + key +
-                ", value=" + value +
-                '}';
+        return "KeyValue{key=" + key + ", value=" + value + '}';
     }
 }

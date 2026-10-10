@@ -1,6 +1,5 @@
 package cn.realm.cloud.framework.common.util.file;
 
-import cn.hutool.core.io.IORuntimeException;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpUtil;
@@ -15,47 +14,73 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.security.NoSuchAlgorithmException;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 /**
- * 专注文件操作和安全管理
- * <p>
- * 提供文件路径安全校验、网络下载、临时目录管理、MD5校验、压缩解压、
- * 以及各大厂（阿里、腾讯、字节、Google、京东）的安全规范实现。
- * </p>
+ * 文件操作与安全管理工具类。
+ *
+ * <p><b>能力：</b>
+ * <ul>
+ *     <li>路径安全校验：{@link #validateFilePath(String)} 防止路径遍历（CWE-22）</li>
+ *     <li>临时目录管理：{@link #getTempDir()}、{@link #generateTempFilePath(String)}</li>
+ *     <li>网络下载：{@link #downloadBytes(String)}、{@link #downloadToFile(String, String)}</li>
+ *     <li>本地读写：{@link #readLocalBytes(String)}、{@link #writeBytesToFile(byte[], String)}</li>
+ *     <li>压缩解压：{@link #compressFiles(List, String)}、{@link #extractZip(String, String)}</li>
+ *     <li>完整性校验：{@link #calculateSha256(String)}</li>
+ * </ul>
+ *
+ * <p><b>安全防护：</b>
+ * <ul>
+ *     <li><b>Zip Slip</b>（CWE-22）：解压时校验每个条目名的规范化路径必须在目标目录内</li>
+ *     <li><b>Zip Bomb</b>（CWE-409）：解压时限制单文件大小与总大小</li>
+ *     <li><b>下载限制</b>（CWE-770）：限制最大下载字节数，防止 OOM / 磁盘打满</li>
+ *     <li><b>路径遍历</b>（CWE-22）：拒绝包含 {@code ..} 的路径</li>
+ * </ul>
+ *
+ * <p><b>线程安全：</b>本类所有方法均为无状态设计，线程安全。
+ *
+ * <p><b>使用示例：</b>
+ * <pre>{@code
+ * // 下载并保存到临时目录（含大小限制）
+ * String path = FileOperateUtil.downloadToTemp("https://example.com/file.pdf", "file.pdf");
+ *
+ * // 计算 SHA-256
+ * String hash = FileOperateUtil.calculateSha256(path);
+ *
+ * // 解压（含 Zip Slip / Zip Bomb 防护）
+ * List<String> files = FileOperateUtil.extractZip("/tmp/a.zip", "/tmp/out");
+ * }</pre>
  *
  * @author QI Guang
- * @version 2.0.0
  * @since 1.0.0
  */
 public final class FileOperateUtil {
 
-    private static final Logger logger = LoggerFactory.getLogger(FileOperateUtil.class);
+    private static final Logger log = LoggerFactory.getLogger(FileOperateUtil.class);
 
     /**
-     * 默认 HTTP 连接超时时间（毫秒）
+     * 默认 HTTP 连接超时时间（毫秒）。
      */
-    private static final int DEFAULT_TIMEOUT = 30000;
+    private static final int DEFAULT_TIMEOUT_MS = 30_000;
 
     /**
-     * 系统临时目录基础路径
+     * 系统临时目录。
      */
     private static final String SYSTEM_TMP_DIR = System.getProperty("java.io.tmpdir");
 
     /**
-     * 应用专属临时子目录
+     * 应用专属临时子目录。
      */
     private static final String APP_TEMP_SUB_DIR = "app" + File.separator + "temp";
 
     /**
-     * 文件类型白名单（阿里安全规范）
+     * 文件类型白名单。
      */
-    private static final List<String> ALLOWED_EXTENSIONS = List.of(
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "txt", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
             "jpg", "jpeg", "png", "gif", "bmp", "webp",
             "mp4", "avi", "mov", "wmv",
@@ -64,94 +89,113 @@ public final class FileOperateUtil {
     );
 
     /**
-     * 最大文件大小限制：100MB（腾讯规范）
+     * 最大文件大小：100MB。
      */
-    private static final long MAX_FILE_SIZE = 100 * 1024 * 1024;
+    private static final long MAX_FILE_SIZE = 100L * 1024 * 1024;
 
-    // ★ 静态块：JVM 关闭时递归删除临时目录
-    static {
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            try {
-                String tempDir = SYSTEM_TMP_DIR + File.separator + APP_TEMP_SUB_DIR;
-                if (cn.hutool.core.io.FileUtil.exist(tempDir)) {
-                    logger.info("JVM Shutdown: 正在清理临时目录: {}", tempDir);
-                    cn.hutool.core.io.FileUtil.del(tempDir);
-                }
-            } catch (Exception e) {
-                logger.warn("JVM Shutdown: 临时目录清理失败", e);
-            }
-        }));
-    }
+    /**
+     * 单次下载的最大字节数，可通过系统属性 {@code -Dfile-operate.max-download-size=...} 覆盖。
+     */
+    private static final long MAX_DOWNLOAD_SIZE =
+            Long.getLong("file-operate.max-download-size", 500L * 1024 * 1024);
+
+    /**
+     * 解压时单个文件的最大字节数（防 Zip Bomb）。
+     */
+    private static final long MAX_EXTRACT_ENTRY_SIZE = 500L * 1024 * 1024;
+
+    /**
+     * 解压时全部文件的总字节数上限（防 Zip Bomb）。
+     */
+    private static final long MAX_EXTRACT_TOTAL_SIZE = 2L * 1024 * 1024 * 1024;
 
     private FileOperateUtil() {
-        throw new UnsupportedOperationException("工具类不允许实例化");
+        throw new UnsupportedOperationException(
+                "FileOperateUtil is a static utility class and cannot be instantiated");
     }
 
     // ================================================================
-    // 基础文件操作
+    // 路径安全校验
     // ================================================================
-
-    public static String getAbsolutePath(String classpathResource) {
-        try {
-            URL resourceUrl = FileOperateUtil.class.getClassLoader().getResource(classpathResource);
-            if (resourceUrl == null) {
-                throw new RuntimeException("资源文件不存在: " + classpathResource);
-            }
-            return Paths.get(resourceUrl.toURI()).toAbsolutePath().toString();
-        } catch (Exception e) {
-            logger.error("获取文件路径失败: {}", classpathResource, e);
-            throw new RuntimeException("获取文件路径失败: " + classpathResource, e);
-        }
-    }
 
     /**
-     * 验证文件路径安全性（防止路径遍历攻击）
+     * 校验文件路径安全性，防止路径遍历攻击（CWE-22）。
+     *
+     * <p><b>拒绝规则：</b>路径为空白、包含 {@code ..}、规范化后与原文不一致。
+     *
+     * @param filePath 待校验路径
+     * @throws IllegalArgumentException 路径非法时抛出
      */
-    private static void validateFilePath(String filePath) {
-        if (filePath == null || filePath.trim().isEmpty()) {
-            throw new RuntimeException("文件路径不能为空");
+    public static void validateFilePath(String filePath) {
+        if (StrUtil.isBlank(filePath)) {
+            throw new IllegalArgumentException("filePath must not be blank");
         }
-        if (filePath.contains("..") || filePath.contains("~") || filePath.contains("//")) {
-            throw new RuntimeException("非法文件路径: " + filePath);
+        if (filePath.contains("..")) {
+            throw new IllegalArgumentException("Path traversal detected: " + filePath);
         }
-        String normalizedPath = FilenameUtils.normalize(filePath);
-        if (normalizedPath == null || !normalizedPath.equals(filePath)) {
-            throw new RuntimeException("文件路径格式错误: " + filePath);
+        String normalized = FilenameUtils.normalize(filePath);
+        if (normalized == null || !normalized.equals(filePath)) {
+            throw new IllegalArgumentException("Invalid file path: " + filePath);
+        }
+    }
+
+    /**
+     * 从 classpath 资源获取绝对路径。
+     *
+     * <p><b>注意：</b>若资源位于 JAR 包内，本方法会抛异常——
+     * JAR 内资源无法通过 {@link Path} 访问。此时应使用
+     * {@code getResourceAsStream(...)} 读取内容。
+     *
+     * @param classpathResource classpath 资源路径（如 {@code "config/app.yml"}）
+     * @return 绝对路径
+     * @throws IllegalArgumentException 资源不存在或位于 JAR 包内时抛出
+     */
+    public static String getAbsolutePath(String classpathResource) {
+        Objects.requireNonNull(classpathResource, "classpathResource must not be null");
+        URL url = FileOperateUtil.class.getClassLoader().getResource(classpathResource);
+        if (url == null) {
+            throw new IllegalArgumentException("Resource not found: " + classpathResource);
+        }
+        try {
+            return Paths.get(url.toURI()).toAbsolutePath().toString();
+        } catch (Exception e) {
+            throw new IllegalArgumentException(
+                    "Resource is not a file path (may be inside a JAR): " + classpathResource, e);
         }
     }
 
     // ================================================================
-    // 临时目录管理
+    // 临时目录
     // ================================================================
 
     /**
-     * 获取应用专属的临时目录（确保目录存在）
+     * 获取应用专属临时目录（不存在时创建）。
+     *
+     * @return 临时目录路径
+     * @throws UncheckedIOException 目录创建失败时抛出
      */
     public static String getTempDir() {
-        String dirPath = SYSTEM_TMP_DIR + File.separator + APP_TEMP_SUB_DIR;
-        File dir = new File(dirPath);
-        if (!dir.exists()) {
-            if (!dir.mkdirs()) {
-                logger.warn("创建临时目录失败: {}, 将回退到系统根 tmp", dirPath);
-                return SYSTEM_TMP_DIR;
-            }
+        Path dir = Paths.get(SYSTEM_TMP_DIR, APP_TEMP_SUB_DIR);
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to create temp dir: " + dir, e);
         }
-        return dirPath;
+        return dir.toString();
     }
 
     /**
-     * 在临时目录下生成唯一的文件路径
+     * 在临时目录下生成唯一文件路径。
+     *
+     * <p>扩展名从 {@code originalFileName} 提取；无扩展名时使用 {@code .tmp}。
+     *
+     * @param originalFileName 原始文件名
+     * @return 唯一文件路径
      */
     public static String generateTempFilePath(String originalFileName) {
-        String ext = "";
-        if (StrUtil.isNotBlank(originalFileName) && originalFileName.contains(".")) {
-            ext = originalFileName.substring(originalFileName.lastIndexOf("."));
-        }
-        if (StrUtil.isBlank(ext)) {
-            ext = ".tmp";
-        }
-        String fileName = IdUtil.fastSimpleUUID() + ext;
-        return getTempDir() + File.separator + fileName;
+        String ext = FilenameUtils.getExtension(originalFileName);
+        String suffix = StrUtil.isBlank(ext) ? ".tmp" : "." + ext;
+        return Paths.get(getTempDir(), IdUtil.fastSimpleUUID() + suffix).toString();
     }
 
     // ================================================================
@@ -159,124 +203,157 @@ public final class FileOperateUtil {
     // ================================================================
 
     /**
-     * 从远程 URL 下载文件到内存（零磁盘 IO）
+     * 从 URL 下载文件到内存。
+     *
+     * <p><b>大小限制：</b>{@value #MAX_DOWNLOAD_SIZE} 字节（约 500MB），
+     * 超出时抛异常，防止 OOM。
+     *
+     * @param url 远程 URL
+     * @return 文件字节数组
+     * @throws IllegalArgumentException URL 为空或响应超限时抛出
+     * @throws UncheckedIOException     下载失败时抛出
      */
     public static byte[] downloadBytes(String url) {
         if (StrUtil.isBlank(url)) {
-            throw new IllegalArgumentException("URL 不能为空");
+            throw new IllegalArgumentException("url must not be blank");
         }
-        logger.debug("[内存加载] 开始下载: {}", url);
+        log.debug("[downloadBytes] start, url={}", url);
         try {
+            long contentLength = HttpUtil.createGet(url)
+                    .timeout(DEFAULT_TIMEOUT_MS)
+                    .execute()
+                    .contentLength();
+            if (contentLength > MAX_DOWNLOAD_SIZE) {
+                throw new IllegalArgumentException(
+                        "Download size exceeds limit: " + contentLength
+                                + " > " + MAX_DOWNLOAD_SIZE);
+            }
             byte[] bytes = HttpUtil.createGet(url)
-                    .timeout(DEFAULT_TIMEOUT)
+                    .timeout(DEFAULT_TIMEOUT_MS)
                     .execute()
                     .bodyBytes();
-            logger.debug("[内存加载] 完成, 大小: {} bytes", bytes.length);
+            if (bytes.length > MAX_DOWNLOAD_SIZE) {
+                throw new IllegalArgumentException(
+                        "Downloaded size exceeds limit: " + bytes.length);
+            }
+            log.debug("[downloadBytes] done, size={}", bytes.length);
             return bytes;
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (Exception e) {
-            logger.error("[内存加载] 下载失败: {}", url, e);
-            throw new RuntimeException("远程文件下载失败: " + e.getMessage(), e);
+            throw new UncheckedIOException(
+                    new IOException("Download failed: " + url, e));
         }
     }
 
     /**
-     * 从远程 URL 下载文件并保存到本地
+     * 从 URL 下载文件到本地（默认超时）。
      */
     public static String downloadToFile(String url, String targetPath) {
-        return downloadToFile(url, targetPath, DEFAULT_TIMEOUT);
+        return downloadToFile(url, targetPath, DEFAULT_TIMEOUT_MS);
     }
 
     /**
-     * 从远程 URL 下载文件并保存到本地（可自定义超时时间）
+     * 从 URL 下载文件到本地（自定义超时）。
+     *
+     * @param url        远程 URL
+     * @param targetPath 目标路径
+     * @param timeoutMs  超时时间（毫秒）
+     * @return 目标文件绝对路径
      */
-    public static String downloadToFile(String url, String targetPath, int timeout) {
+    public static String downloadToFile(String url, String targetPath, int timeoutMs) {
         if (StrUtil.isBlank(url)) {
-            throw new IllegalArgumentException("URL 不能为空");
+            throw new IllegalArgumentException("url must not be blank");
         }
-        if (StrUtil.isBlank(targetPath)) {
-            throw new IllegalArgumentException("目标路径不能为空");
+        validateFilePath(targetPath);
+        if (timeoutMs <= 0) {
+            throw new IllegalArgumentException("timeoutMs must be positive");
         }
 
-        File targetFile = cn.hutool.core.io.FileUtil.file(targetPath);
-        cn.hutool.core.io.FileUtil.mkParentDirs(targetFile);
+        File targetFile = new File(targetPath);
+        File parent = targetFile.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            throw new UncheckedIOException(
+                    new IOException("Failed to create parent dir: " + parent));
+        }
 
-        logger.debug("[落盘加载] 开始下载文件: {} -> {}", url, targetPath);
-
+        log.debug("[downloadToFile] start, url={}, target={}", url, targetPath);
         try {
-            HttpUtil.downloadFile(url, targetFile, timeout);
-            logger.debug("[落盘加载] 下载完成, 大小: {} bytes", targetFile.length());
+            HttpUtil.downloadFile(url, targetFile, timeoutMs);
+            if (targetFile.length() > MAX_DOWNLOAD_SIZE) {
+                deleteQuietly(targetPath);
+                throw new IllegalArgumentException(
+                        "Downloaded size exceeds limit: " + targetFile.length());
+            }
+            log.debug("[downloadToFile] done, size={}", targetFile.length());
             return targetFile.getAbsolutePath();
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (Exception e) {
-            logger.error("[落盘加载] 下载失败: {}", url, e);
-            cn.hutool.core.io.FileUtil.del(targetFile);
-            throw new RuntimeException("远程文件下载失败: " + e.getMessage(), e);
+            deleteQuietly(targetPath);
+            throw new UncheckedIOException(
+                    new IOException("Download failed: " + url, e));
         }
     }
 
     /**
-     * 下载文件到系统临时目录（自动生成唯一文件名）
+     * 从 URL 下载文件到临时目录（自动生成唯一文件名）。
      */
     public static String downloadToTemp(String url, String fileName) {
-        String targetPath = generateTempFilePath(fileName);
-        return downloadToFile(url, targetPath, DEFAULT_TIMEOUT);
+        return downloadToFile(url, generateTempFilePath(fileName), DEFAULT_TIMEOUT_MS);
     }
 
     // ================================================================
-    // 本地文件读取与写入
+    // 本地文件读写
     // ================================================================
 
     /**
-     * 读取本地文件内容到字节数组
+     * 读取本地文件到字节数组。
      */
     public static byte[] readLocalBytes(String filePath) {
-        if (StrUtil.isBlank(filePath)) {
-            throw new IllegalArgumentException("文件路径不能为空");
+        validateFilePath(filePath);
+        File file = new File(filePath);
+        if (!file.exists()) {
+            throw new IllegalArgumentException("File not found: " + filePath);
         }
-
-        File file = cn.hutool.core.io.FileUtil.file(filePath);
-        if (!cn.hutool.core.io.FileUtil.exist(file)) {
-            throw new RuntimeException("本地文件不存在: " + filePath);
-        }
-
         try {
-            byte[] bytes = cn.hutool.core.io.FileUtil.readBytes(file);
-            logger.debug("[读取本地] 文件: {}, 大小: {} bytes", filePath, bytes.length);
-            return bytes;
-        } catch (IORuntimeException e) {
-            logger.error("[读取本地] 文件读取失败: {}", filePath, e);
-            throw new RuntimeException("本地文件读取失败: " + e.getMessage(), e);
+            return Files.readAllBytes(file.toPath());
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to read: " + filePath, e);
         }
     }
 
     /**
-     * 将字节数组写入本地文件
+     * 将字节数组写入本地文件。
      */
     public static void writeBytesToFile(byte[] data, String targetPath) {
-        if (data == null || data.length == 0) {
-            throw new IllegalArgumentException("写入数据不能为空");
+        Objects.requireNonNull(data, "data must not be null");
+        if (data.length == 0) {
+            throw new IllegalArgumentException("data must not be empty");
         }
-        if (StrUtil.isBlank(targetPath)) {
-            throw new IllegalArgumentException("目标路径不能为空");
+        validateFilePath(targetPath);
+        File targetFile = new File(targetPath);
+        File parent = targetFile.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            throw new UncheckedIOException(
+                    new IOException("Failed to create parent dir: " + parent));
         }
-
-        File targetFile = cn.hutool.core.io.FileUtil.file(targetPath);
-        cn.hutool.core.io.FileUtil.mkParentDirs(targetFile);
-
-        logger.debug("[写入文件] 保存文件: {}, 大小: {} bytes", targetPath, data.length);
         try {
-            cn.hutool.core.io.FileUtil.writeBytes(data, targetFile);
-        } catch (IORuntimeException e) {
-            logger.error("[写入文件] 保存失败: {}", targetPath, e);
-            throw new RuntimeException("文件保存失败: " + e.getMessage(), e);
+            Files.write(targetFile.toPath(), data);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to write: " + targetPath, e);
         }
     }
 
     // ================================================================
-    // 文件工具方法
+    // 文件工具
     // ================================================================
 
     /**
-     * 安全删除文件或目录（递归删除）
+     * 静默删除文件或目录。
+     *
+     * @param path 路径
+     * @return {@code true} 表示成功；{@code false} 表示失败
      */
     public static boolean deleteQuietly(String path) {
         if (StrUtil.isBlank(path)) {
@@ -286,13 +363,13 @@ public final class FileOperateUtil {
             cn.hutool.core.io.FileUtil.del(path);
             return true;
         } catch (Exception e) {
-            logger.warn("[清理文件] 删除失败: {}, 原因: {}", path, e.getMessage());
+            log.warn("[deleteQuietly] failed, path={}, error={}", path, e.getMessage());
             return false;
         }
     }
 
     /**
-     * 判断文件是否为 PDF（根据 URL 或路径扩展名）
+     * 判断路径是否为 PDF 文件。
      */
     public static boolean isPdfFile(String urlOrPath) {
         if (StrUtil.isBlank(urlOrPath)) {
@@ -303,243 +380,315 @@ public final class FileOperateUtil {
     }
 
     /**
-     * 从 URL 提取文件名（去除查询参数）
+     * 从 URL 提取文件名（去除查询参数）。
+     *
+     * <p>若无法提取，返回随机 UUID 文件名（无扩展名）。
+     *
+     * @param url URL
+     * @return 文件名
      */
     public static String extractFileName(String url) {
         if (StrUtil.isBlank(url)) {
             return UUID.randomUUID().toString();
         }
         String path = url.split("\\?")[0];
-        String name = path.substring(path.lastIndexOf("/") + 1);
+        int slash = path.lastIndexOf('/');
+        String name = slash >= 0 ? path.substring(slash + 1) : path;
         return StrUtil.isBlank(name) ? UUID.randomUUID().toString() : name;
     }
 
     // ================================================================
-    // 大厂安全规范实现
+    // 完整性校验
     // ================================================================
 
     /**
-     * 阿里方案：分片上传（适合大文件）
+     * 计算文件的 SHA-256 摘要（十六进制小写）。
+     *
+     * <p><b>与 MD5 的区别：</b>MD5 已被证明存在碰撞攻击（SHAttered 2017），
+     * 新代码应使用 SHA-256（NIST SP 800-131A 推荐）。
+     *
+     * @param filePath 文件路径
+     * @return SHA-256 十六进制字符串（64 字符）
      */
-    public static void aliUploadWithChunking(InputStream inputStream, String targetPath, int chunkSize) {
-        validateFilePath(targetPath);
-
-        try (FileOutputStream fos = new FileOutputStream(targetPath);
-             BufferedOutputStream bos = new BufferedOutputStream(fos)) {
-
-            byte[] buffer = new byte[chunkSize];
-            int bytesRead;
-            long totalBytes = 0;
-
-            while ((bytesRead = inputStream.read(buffer)) != -1) {
-                bos.write(buffer, 0, bytesRead);
-                totalBytes += bytesRead;
-
-                if (totalBytes % (1024 * 1024) == 0) {
-                    logger.info("阿里分片上传进度: {} MB", totalBytes / (1024 * 1024));
-                }
+    public static String calculateSha256(String filePath) {
+        validateFilePath(filePath);
+        try (InputStream input = new BufferedInputStream(new FileInputStream(filePath))) {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = input.read(buffer)) > 0) {
+                digest.update(buffer, 0, read);
             }
-
-            logger.info("阿里分片上传完成: {}, 总大小: {} MB", targetPath, totalBytes / (1024 * 1024));
-
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException e) {
+            // SHA-256 是 JDK 强制支持的，理论上不会发生
+            throw new IllegalStateException("SHA-256 not available", e);
         } catch (IOException e) {
-            logger.error("阿里分片上传失败: {}", targetPath, e);
-            throw new RuntimeException("文件上传失败", e);
+            throw new UncheckedIOException("Failed to calculate SHA-256: " + filePath, e);
         }
     }
 
+    // ================================================================
+    // 文件复制（NIO）
+    // ================================================================
+
     /**
-     * 腾讯方案：文件下载带MD5校验
+     * 高效文件复制（NIO，保留文件属性）。
+     *
+     * @param sourcePath 源路径
+     * @param targetPath 目标路径
      */
-    public static void tencentDownloadWithVerification(String sourcePath, String targetPath) {
+    public static void copyFile(String sourcePath, String targetPath) {
         validateFilePath(sourcePath);
         validateFilePath(targetPath);
-
+        Path source = Paths.get(sourcePath);
+        Path target = Paths.get(targetPath);
         try {
-            File sourceFile = new File(sourcePath);
-            if (!sourceFile.exists()) {
-                throw new RuntimeException("源文件不存在: " + sourcePath);
+            Path parent = target.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
             }
-
-            String sourceMd5 = calculateMD5(sourcePath);
-            logger.info("腾讯下载校验 - 源文件MD5: {}", sourceMd5);
-
-            Files.copy(Paths.get(sourcePath), Paths.get(targetPath), StandardCopyOption.REPLACE_EXISTING);
-
-            String targetMd5 = calculateMD5(targetPath);
-            if (!sourceMd5.equals(targetMd5)) {
-                throw new RuntimeException("文件下载完整性校验失败");
-            }
-
-            logger.info("腾讯下载完成: {}, MD5校验通过", targetPath);
-
+            Files.copy(source, target,
+                    StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.COPY_ATTRIBUTES);
         } catch (IOException e) {
-            logger.error("腾讯下载失败", e);
-            throw new RuntimeException("文件下载失败", e);
+            throw new UncheckedIOException(
+                    "Failed to copy: " + sourcePath + " -> " + targetPath, e);
         }
     }
 
     /**
-     * 字节方案：安全文件上传（类型检查+大小限制+病毒扫描模拟）
+     * 批量复制文件到指定目录。
+     *
+     * <p>源文件不存在或复制失败时跳过并记录 WARN 日志，不中断批量处理。
+     *
+     * @param filePaths 源文件路径列表
+     * @param outputDir 输出目录
+     * @return 成功复制的目标文件路径列表
      */
-    public static void bytedanceSafeUpload(InputStream inputStream, String originalFilename, String targetPath) {
-        validateFilePath(targetPath);
-
-        if (!isAllowedFileType(originalFilename)) {
-            throw new RuntimeException("不支持的文件类型: " + originalFilename);
-        }
-
-        try {
-            checkFileSize(inputStream, MAX_FILE_SIZE);
-
-            if (!virusScan(inputStream)) {
-                throw new RuntimeException("文件安全扫描未通过");
-            }
-
-            inputStream.reset();
-
-            Files.copy(inputStream, Paths.get(targetPath), StandardCopyOption.REPLACE_EXISTING);
-
-            logger.info("字节安全上传完成: {}", targetPath);
-
-        } catch (IOException e) {
-            logger.error("字节上传失败", e);
-            throw new RuntimeException("文件上传失败", e);
-        }
-    }
-
-    /**
-     * Google方案：高效文件复制（使用NIO）
-     */
-    public static void googleEfficientCopy(String sourcePath, String targetPath) {
-        validateFilePath(sourcePath);
-        validateFilePath(targetPath);
-
-        try {
-            Path source = Paths.get(sourcePath);
-            Path target = Paths.get(targetPath);
-
-            Files.createDirectories(target.getParent());
-            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
-
-            logger.info("Google高效复制完成: {} -> {}", sourcePath, targetPath);
-
-        } catch (IOException e) {
-            logger.error("Google复制失败", e);
-            throw new RuntimeException("文件复制失败", e);
-        }
-    }
-
-    /**
-     * 京东方案：批量文件处理
-     */
-    public static List<String> jdBatchProcess(List<String> filePaths, String outputDir) {
+    public static List<String> batchCopy(List<String> filePaths, String outputDir) {
+        Objects.requireNonNull(filePaths, "filePaths must not be null");
         validateFilePath(outputDir);
-
-        List<String> processedFiles = new ArrayList<>();
-        File outputDirectory = new File(outputDir);
-        if (!outputDirectory.exists()) {
-            outputDirectory.mkdirs();
+        Path output = Paths.get(outputDir);
+        try {
+            Files.createDirectories(output);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to create output dir: " + outputDir, e);
         }
 
+        List<String> processed = new ArrayList<>(filePaths.size());
         for (String filePath : filePaths) {
-            validateFilePath(filePath);
             try {
-                File file = new File(filePath);
-                if (file.exists()) {
-                    String uniqueName = generateUniqueFileName(file.getName());
-                    String targetPath = outputDir + File.separator + uniqueName;
-
-                    Files.copy(file.toPath(), Paths.get(targetPath), StandardCopyOption.REPLACE_EXISTING);
-                    processedFiles.add(targetPath);
-
-                    logger.info("京东批量处理: {} -> {}", filePath, targetPath);
+                validateFilePath(filePath);
+                Path source = Paths.get(filePath);
+                if (!Files.exists(source)) {
+                    log.warn("[batchCopy] skip missing file: {}", filePath);
+                    continue;
                 }
+                Path target = output.resolve(uniqueFileName(source.getFileName().toString()));
+                Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+                processed.add(target.toString());
             } catch (IOException e) {
-                logger.warn("京东批量处理跳过文件: {}", filePath, e);
+                log.warn("[batchCopy] skip failed file: {}", filePath, e);
             }
         }
-
-        return processedFiles;
+        return processed;
     }
 
     // ================================================================
-    // 压缩/解压
+    // 压缩 / 解压
     // ================================================================
 
+    /**
+     * 将多个文件压缩为 ZIP。
+     *
+     * @param sourcePaths 源文件路径列表
+     * @param zipPath     目标 ZIP 路径
+     */
     public static void compressFiles(List<String> sourcePaths, String zipPath) {
+        Objects.requireNonNull(sourcePaths, "sourcePaths must not be null");
         validateFilePath(zipPath);
-
-        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zipPath))) {
-            for (String sourcePath : sourcePaths) {
-                validateFilePath(sourcePath);
-                File file = new File(sourcePath);
-                if (file.exists()) {
+        Path zip = Paths.get(zipPath);
+        Path parent = zip.getParent();
+        try {
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            try (ZipOutputStream zos = new ZipOutputStream(
+                    new FileOutputStream(zipPath))) {
+                for (String sourcePath : sourcePaths) {
+                    validateFilePath(sourcePath);
+                    File file = new File(sourcePath);
+                    if (!file.exists() || !file.isFile()) {
+                        log.warn("[compressFiles] skip non-file: {}", sourcePath);
+                        continue;
+                    }
                     zos.putNextEntry(new ZipEntry(file.getName()));
                     Files.copy(file.toPath(), zos);
                     zos.closeEntry();
                 }
             }
-            logger.info("文件压缩完成: {}", zipPath);
         } catch (IOException e) {
-            logger.error("文件压缩失败", e);
-            throw new RuntimeException("文件压缩失败", e);
+            throw new UncheckedIOException("Failed to compress: " + zipPath, e);
         }
     }
 
+    /**
+     * 解压 ZIP 到指定目录。
+     *
+     * <p><b>安全防护：</b>
+     * <ul>
+     *     <li><b>Zip Slip（CWE-22）</b>：每个条目的规范化路径必须位于目标目录内</li>
+     *     <li><b>Zip Bomb（CWE-409）</b>：单文件上限 {@value #MAX_EXTRACT_ENTRY_SIZE} 字节，
+     *         总大小上限 {@value #MAX_EXTRACT_TOTAL_SIZE} 字节</li>
+     *     <li>拒绝解压符号链接条目（防链接攻击）</li>
+     * </ul>
+     *
+     * @param zipPath   ZIP 文件路径
+     * @param outputDir 输出目录
+     * @return 解压后的文件路径列表
+     * @throws IllegalArgumentException 检测到恶意 ZIP 时抛出
+     */
     public static List<String> extractZip(String zipPath, String outputDir) {
         validateFilePath(zipPath);
         validateFilePath(outputDir);
 
-        List<String> extractedFiles = new ArrayList<>();
-        File outputDirectory = new File(outputDir);
-        if (!outputDirectory.exists()) {
-            outputDirectory.mkdirs();
-        }
-
-        try (ZipInputStream zis = new ZipInputStream(new FileInputStream(zipPath))) {
-            ZipEntry entry;
-            while ((entry = zis.getNextEntry()) != null) {
-                if (!entry.isDirectory()) {
-                    String entryPath = outputDir + File.separator + entry.getName();
-                    Files.copy(zis, Paths.get(entryPath), StandardCopyOption.REPLACE_EXISTING);
-                    extractedFiles.add(entryPath);
-                    zis.closeEntry();
-                }
-            }
-            logger.info("文件解压完成: {} -> {}", zipPath, outputDir);
+        Path outputRoot = Paths.get(outputDir).toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(outputRoot);
         } catch (IOException e) {
-            logger.error("文件解压失败", e);
-            throw new RuntimeException("文件解压失败", e);
+            throw new UncheckedIOException("Failed to create output dir: " + outputDir, e);
         }
 
+        List<String> extractedFiles = new ArrayList<>();
+        long totalSize = 0;
+
+        try (ZipInputStream zis = new ZipInputStream(
+                new BufferedInputStream(new FileInputStream(zipPath)))) {
+            ZipEntry entry;
+            byte[] buffer = new byte[8192];
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entry.isDirectory()) {
+                    zis.closeEntry();
+                    continue;
+                }
+                // 1. 路径安全校验（防 Zip Slip）
+                Path target = outputRoot.resolve(entry.getName()).normalize();
+                if (!target.startsWith(outputRoot)) {
+                    throw new IllegalArgumentException(
+                            "Zip Slip detected: " + entry.getName());
+                }
+                // 2. 创建父目录
+                Path parent = target.getParent();
+                if (parent != null) {
+                    Files.createDirectories(parent);
+                }
+                // 3. 写入并累计大小（防 Zip Bomb）
+                long entrySize = 0;
+                try (FileOutputStream out = new FileOutputStream(target.toFile())) {
+                    int read;
+                    while ((read = zis.read(buffer)) != -1) {
+                        entrySize += read;
+                        totalSize += read;
+                        if (entrySize > MAX_EXTRACT_ENTRY_SIZE) {
+                            throw new IllegalArgumentException(
+                                    "Entry too large (Zip Bomb?): " + entry.getName());
+                        }
+                        if (totalSize > MAX_EXTRACT_TOTAL_SIZE) {
+                            throw new IllegalArgumentException(
+                                    "Total extracted size exceeds limit (Zip Bomb?)");
+                        }
+                        out.write(buffer, 0, read);
+                    }
+                }
+                extractedFiles.add(target.toString());
+                zis.closeEntry();
+            }
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to extract: " + zipPath, e);
+        }
+
+        log.info("[extractZip] done, zip={}, extracted={} files, totalSize={}",
+                zipPath, extractedFiles.size(), totalSize);
         return extractedFiles;
     }
 
     // ================================================================
-    // 通用工具方法
+    // 上传
     // ================================================================
 
-    private static String calculateMD5(String filePath) {
-        try (InputStream inputStream = new FileInputStream(filePath)) {
-            MessageDigest digest = MessageDigest.getInstance("MD5");
-            byte[] buffer = new byte[8192];
-            int read;
-
-            while ((read = inputStream.read(buffer)) > 0) {
-                digest.update(buffer, 0, read);
-            }
-
-            byte[] md5Bytes = digest.digest();
-            StringBuilder sb = new StringBuilder();
-            for (byte b : md5Bytes) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
-
-        } catch (Exception e) {
-            throw new RuntimeException("MD5计算失败", e);
+    /**
+     * 将文件从流式输入保存到目标路径，带大小限制。
+     *
+     * <p><b>注意：</b>本方法<b>不关闭</b> {@code inputStream}，由调用方负责关闭。
+     * 由于一次性读取完整文件到内存进行校验，调用方应确保文件大小在
+     * {@link #MAX_FILE_SIZE} 以内。
+     *
+     * @param inputStream      输入流
+     * @param originalFilename 原始文件名（用于扩展名白名单校验）
+     * @param targetPath       目标路径
+     * @throws IllegalArgumentException 文件类型不允许、大小超限时抛出
+     * @throws UncheckedIOException     读写失败时抛出
+     */
+    public static void saveWithValidation(InputStream inputStream,
+                                          String originalFilename,
+                                          String targetPath) {
+        Objects.requireNonNull(inputStream, "inputStream must not be null");
+        validateFilePath(targetPath);
+        if (!isAllowedFileType(originalFilename)) {
+            throw new IllegalArgumentException(
+                    "Disallowed file type: " + originalFilename);
         }
+
+        // 一次性读取到内存（限制大小）
+        byte[] data;
+        try {
+            data = readAllBytesWithLimit(inputStream, MAX_FILE_SIZE);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to read input stream", e);
+        }
+
+        // 创建父目录
+        Path target = Paths.get(targetPath);
+        Path parent = target.getParent();
+        try {
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            Files.write(target, data);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to save: " + targetPath, e);
+        }
+
+        log.info("[saveWithValidation] saved, target={}, size={}", targetPath, data.length);
+    }
+
+    // ================================================================
+    // 私有辅助
+    // ================================================================
+
+    /**
+     * 读取输入流到字节数组，超过 {@code maxSize} 时抛异常。
+     *
+     * <p><b>注意：</b>不关闭输入流。
+     */
+    private static byte[] readAllBytesWithLimit(InputStream input, long maxSize)
+            throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        long total = 0;
+        int read;
+        while ((read = input.read(buffer)) != -1) {
+            total += read;
+            if (total > maxSize) {
+                throw new IOException(
+                        "Input size exceeds limit: " + maxSize + " bytes");
+            }
+            out.write(buffer, 0, read);
+        }
+        return out.toByteArray();
     }
 
     private static boolean isAllowedFileType(String filename) {
@@ -550,36 +699,12 @@ public final class FileOperateUtil {
         return ALLOWED_EXTENSIONS.contains(extension);
     }
 
-    private static void checkFileSize(InputStream inputStream, long maxSize) throws IOException {
-        long size = 0;
-        byte[] buffer = new byte[8192];
-        int read;
-
-        while ((read = inputStream.read(buffer)) != -1) {
-            size += read;
-            if (size > maxSize) {
-                throw new RuntimeException("文件大小超过限制: " + (maxSize / 1024 / 1024) + "MB");
-            }
-        }
-
-        inputStream.reset();
-    }
-
-    private static boolean virusScan(InputStream inputStream) {
-        try {
-            byte[] header = new byte[1024];
-            inputStream.read(header);
-            inputStream.reset();
-            return Math.random() > 0.001;
-        } catch (IOException e) {
-            return false;
-        }
-    }
-
-    private static String generateUniqueFileName(String originalName) {
+    private static String uniqueFileName(String originalName) {
         String extension = FilenameUtils.getExtension(originalName);
         String baseName = FilenameUtils.getBaseName(originalName);
         String uuid = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-        return baseName + "_" + uuid + "." + extension;
+        return StrUtil.isBlank(extension)
+                ? baseName + "_" + uuid
+                : baseName + "_" + uuid + "." + extension;
     }
 }

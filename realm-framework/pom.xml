@@ -38,6 +38,7 @@
         <module>realm-spring-boot-starter-websocket</module>
         <module>realm-spring-boot-starter-protection</module>
         <module>realm-spring-boot-starter-biz-tenant</module>
+        <module>realm-spring-boot-starter-data-jpa</module>
     </modules>
 
     <!-- 项目信息：本模块是技术组件聚合层 / Project info: aggregator layer for technical components -->

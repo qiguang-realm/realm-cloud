@@ -3,76 +3,119 @@ package cn.realm.cloud.framework.common.pojo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 
 /**
- * 分页参数
- *
- * <p>支持普通分页和“不分页”（pageSize = -1）两种模式，适用于列表查询和导出等场景。
+ * 分页请求参数（框架无关）。
+ * <p>字段命名保持中性，可同时映射到：
+ * <ul>
+ *     <li>MyBatis-Plus 的 {@code Page(current, size)}</li>
+ *     <li>Spring Data JPA 的 {@code PageRequest.of(pageNum - 1, pageSize)}</li>
+ * </ul>
+ * <p>本类位于 realm-common，不依赖任何持久层框架；具体转换方法由
+ * {@code realm-spring-boot-starter-mybatis} 和 {@code realm-spring-boot-starter-data-jpa} 分别提供。
  *
  * @author QI Guang
  */
-@Schema(description = "分页参数")
 @Data
+@NoArgsConstructor
+@Schema(description = "分页请求参数")
 public class PageParam implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    // ---------- 常量定义 ----------
+
     /**
-     * 默认页码
+     * 默认页码（从 1 开始）
      */
-    private static final Integer PAGE_NO = 1;
+    public static final int DEFAULT_PAGE_NUM = 1;
 
     /**
      * 默认每页条数
      */
-    private static final Integer PAGE_SIZE = 10;
+    public static final int DEFAULT_PAGE_SIZE = 10;
 
     /**
-     * 每页条数 - 不分页
-     * <p>设置此值时，表示查询所有数据（不分页），例如导出接口。
+     * 最大每页条数（防止恶意请求导致性能问题）
      */
-    public static final Integer PAGE_SIZE_NONE = -1;
+    public static final int MAX_PAGE_SIZE = 100;
 
     /**
-     * 每页条数最大值（可配置，这里硬编码为 200，实际可从配置读取）
+     * 不分页标识：当 pageSize 等于此值时，表示查询所有数据（不分页）。
+     * <p>请谨慎使用，仅适用于导出、下拉选项等确实需要全量数据的场景。
      */
-    private static final Integer MAX_PAGE_SIZE = 200;
+    public static final int PAGE_SIZE_NONE = -1;
 
-    @Schema(description = "页码，从 1 开始", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
-    @NotNull(message = "页码不能为空")
+    // ---------- 字段 ----------
+
+    /**
+     * 当前页码（从 1 开始）。
+     * <p>转换为 Spring Data JPA 的 {@code PageRequest} 时需减 1（Spring Data 从 0 开始）。
+     */
+    @Schema(description = "页码，从 1 开始",
+            example = "1",
+            requiredMode = Schema.RequiredMode.REQUIRED)
     @Min(value = 1, message = "页码最小值为 1")
-    private Integer pageNo = PAGE_NO;
-
-    @Schema(description = "每页条数，-1 表示不分页，最大值为 200", requiredMode = Schema.RequiredMode.REQUIRED, example = "10")
-    @NotNull(message = "每页条数不能为空")
-    @Min(value = -1, message = "每页条数最小值为 -1")
-    @Max(value = 200, message = "每页条数最大值为 200")
-    private Integer pageSize = PAGE_SIZE;
+    private int pageNum = DEFAULT_PAGE_NUM;
 
     /**
-     * 是否不分页（即查询所有数据）
+     * 每页条数。
+     * <p>当值为 {@value #PAGE_SIZE_NONE} 时表示不分页。
      */
-    public boolean isUnlimited() {
-        return PAGE_SIZE_NONE.equals(pageSize);
+    @Schema(description = "每页条数，-1 表示不分页（查询全部，慎用），最大 100",
+            example = "10",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+    @Min(value = PAGE_SIZE_NONE, message = "每页条数最小值为 " + PAGE_SIZE_NONE)
+    @Max(value = MAX_PAGE_SIZE, message = "每页条数最大值为 " + MAX_PAGE_SIZE)
+    private int pageSize = DEFAULT_PAGE_SIZE;
+
+    // ---------- 工厂方法 ----------
+
+    /**
+     * 快速构建一个分页请求。
+     */
+    public static PageParam of(int pageNum, int pageSize) {
+        PageParam param = new PageParam();
+        param.setPageNum(pageNum);
+        param.setPageSize(pageSize);
+        return param;
     }
 
     /**
-     * 获取 SQL 偏移量（用于 LIMIT offset, size）
-     *
-     * @return 偏移量，不分页时返回 0
+     * 返回一个不分页的请求（pageSize = -1）。
+     */
+    public static PageParam none() {
+        return of(DEFAULT_PAGE_NUM, PAGE_SIZE_NONE);
+    }
+
+    // ---------- 便捷方法 ----------
+
+    /**
+     * 判断当前请求是否启用分页。
+     */
+    public boolean isPaged() {
+        return this.pageSize > 0;
+    }
+
+    /**
+     * 获取 SQL 偏移量（从第几条开始）。
+     * <p>公式：(pageNum - 1) * pageSize
      */
     public long getOffset() {
-        if (isUnlimited()) {
+        if (!isPaged()) {
             return 0L;
         }
-        // 使用 long 计算，避免 (pageNo - 1) * pageSize 溢出 int 范围
-        return (long) (pageNo - 1) * pageSize;
+        return (long) (pageNum - 1) * pageSize;
     }
 
-    // 可选：提供与 MyBatis-Plus Page 对象的转换（若项目使用 MyBatis-Plus，建议放在独立工具类中）
-    // 此处仅展示内部方法，避免引入依赖
+    /**
+     * 获取实际有效的 pageSize（若不分页则返回 0）。
+     */
+    public int getEffectivePageSize() {
+        return isPaged() ? pageSize : 0;
+    }
 }
