@@ -19,6 +19,7 @@ import java.util.Optional;
  *     <tr><td>2xxx</td><td>业务级</td><td>{@link #USER_NOT_FOUND}、{@link #ORDER_NOT_FOUND}</td></tr>
  *     <tr><td>3xxx</td><td>认证授权级</td><td>{@link #AUTH_UNAUTHORIZED}、{@link #AUTH_FORBIDDEN}</td></tr>
  *     <tr><td>4xxx</td><td>第三方/依赖级</td><td>{@link #REMOTE_SERVICE_ERROR}</td></tr>
+ *     <tr><td>9xxx</td><td>兜底</td><td>{@link #UNKNOWN_ERROR}</td></tr>
  * </table>
  *
  * <p><b>业务细分建议：</b>每个领域预留 100 个错误码空间。
@@ -96,6 +97,14 @@ public enum ErrorCode {
      */
     METHOD_NOT_ALLOWED(1004, "不支持的 HTTP 方法"),
 
+    /**
+     * 请求的资源不存在（HTTP 404）。
+     *
+     * <p><b>触发场景：</b>{@code NoHandlerFoundException}、按 ID 查询未命中。
+     * <p><b>恢复建议：</b>检查 URL 路径或资源标识。
+     */
+    NOT_FOUND(1005, "请求的资源不存在"),
+
     // ==================== 业务级 (2xxx) ====================
 
     /**
@@ -160,15 +169,15 @@ public enum ErrorCode {
      */
     REMOTE_TIMEOUT(4002, "依赖服务调用超时"),
 
-    // ==================== 兜底 ====================
+    // ==================== 兜底 (9xxx) ====================
 
     /**
      * 未知错误（兜底）。
      *
      * <p>当 {@link #fromCode(int)} 未匹配任何已知错误码时返回此值。
-     * <p>该错误码使用 <b>-1</b>，与业务错误码（正数）区分。
+     * <p>使用 9xxx 段位，保持 {@code code > 0} 的统一约定，便于网关按区间路由。
      */
-    UNKNOWN_ERROR(-1, "未知错误");
+    UNKNOWN_ERROR(9999, "未知错误");
 
     // ==================== 静态索引 ====================
 
@@ -184,9 +193,9 @@ public enum ErrorCode {
         for (ErrorCode errorCode : values()) {
             ErrorCode existing = map.putIfAbsent(errorCode.code, errorCode);
             if (existing != null) {
-                throw new IllegalStateException(
-                        "错误码重复：" + errorCode.code + " 同时归属于 "
-                                + existing.name() + " 和 " + errorCode.name());
+                throw new IllegalStateException(String.format(
+                        "ErrorCode 重复定义：code=%d 同时归属 %s 和 %s",
+                        errorCode.code, existing.name(), errorCode.name()));
             }
         }
         CODE_MAP = Collections.unmodifiableMap(map);
@@ -201,7 +210,6 @@ public enum ErrorCode {
      * <ul>
      *     <li>0：成功</li>
      *     <li>正数：业务失败（按区段分类）</li>
-     *     <li>-1：未知错误（兜底）</li>
      * </ul>
      */
     private final int code;
@@ -265,17 +273,5 @@ public enum ErrorCode {
      */
     public boolean isFailure() {
         return !isSuccess();
-    }
-
-    // ==================== 调试支持 ====================
-
-    /**
-     * 获取所有 code 到 {@link ErrorCode} 的映射（仅供调试使用）。
-     *
-     * <p><b>注意：</b>返回的 Map 不可变，但<b>不推荐业务代码使用</b>——
-     * 建议通过 {@link #fromCode(int)} 或 {@link #fromCodeOrDefault(int)} 查询。
-     */
-    public static Map<Integer, ErrorCode> getCodeMap() {
-        return CODE_MAP;
     }
 }

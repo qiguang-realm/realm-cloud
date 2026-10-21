@@ -1,11 +1,12 @@
 package cn.realm.cloud.framework.web.core.handler;
 
 import cn.realm.cloud.framework.common.base.api.ApiResponse;
+import cn.realm.cloud.framework.common.enums.ErrorCode;
+import cn.realm.cloud.framework.common.trace.TraceContextAccessor;
 import cn.realm.cloud.framework.web.core.annotation.RawResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -48,7 +49,7 @@ import java.util.Set;
  * <ul>
  *     <li>返回值已是 {@link ApiResponse}（避免二次包装）</li>
  *     <li>返回值是 {@link ResponseEntity}（用户已控制 HTTP 状态）</li>
- *     <li>返回值是 {@link Resource} / {@link byte[]} / {@link StreamingResponseBody}（文件下载）</li>
+ *     <li>返回值是 {@link Resource} / {@code byte[]} / {@link StreamingResponseBody}（文件下载）</li>
  *     <li>返回值是 {@link String}（避免与 {@code StringHttpMessageConverter} 冲突）</li>
  *     <li>方法或类标注 {@link RawResponse}（显式跳过）</li>
  *     <li>URL 匹配排除列表（Actuator / Swagger / 健康检查）</li>
@@ -59,11 +60,17 @@ import java.util.Set;
  * 若返回 {@link ApiResponse}，会导致 {@link ClassCastException}。
  * 因此本 Advice <b>跳过</b> {@code String} 返回值，让 Controller 自己包装。
  *
+ * <p><b>traceId 注入来源：</b>
+ * 通过 {@link TraceContextAccessor#currentTraceId()} 获取，
+ * 数据源为 OpenTelemetry {@code Span.current()}，
+ * 与 {@code TraceContextFilter} 写入的 {@code traceparent} 保持一致。
+ *
  * <p><b>线程安全：</b>本类无状态，线程安全。
  *
  * @author QI Guang
  * @see GlobalExceptionHandler
  * @see RawResponse
+ * @see TraceContextAccessor
  * @since 1.0.0
  */
 @RestControllerAdvice
@@ -71,11 +78,6 @@ import java.util.Set;
 public class GlobalResponseBodyAdvice implements ResponseBodyAdvice<Object> {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalResponseBodyAdvice.class);
-
-    /**
-     * MDC 中 traceId 的 key。
-     */
-    private static final String TRACE_ID_KEY = "traceId";
 
     /**
      * 排除包装的 URL 前缀。
@@ -118,11 +120,7 @@ public class GlobalResponseBodyAdvice implements ResponseBodyAdvice<Object> {
 
         // 2. 检查 URL 排除列表
         HttpServletRequest request = currentRequest();
-        if (request != null && isExcludedPath(request.getRequestURI())) {
-            return false;
-        }
-
-        return true;
+        return request == null || !isExcludedPath(request.getRequestURI());
     }
 
     /**
@@ -155,7 +153,6 @@ public class GlobalResponseBodyAdvice implements ResponseBodyAdvice<Object> {
         }
 
         // 3. ResponseEntity：用户已控制 HTTP 状态，不包装
-        //    注意：ResponseEntity 通常已由框架处理，此分支为防御性编程
         if (body instanceof ResponseEntity<?>) {
             return body;
         }
@@ -166,21 +163,19 @@ public class GlobalResponseBodyAdvice implements ResponseBodyAdvice<Object> {
         }
 
         // 5. String：避免与 StringHttpMessageConverter 冲突
-        //    原因：StringHttpMessageConverter 期望 body 是 String，
-        //    若返回 ApiResponse，会导致 ClassCastException
         if (body instanceof String) {
             return body;
         }
 
         // 6. 其他类型：包装为 ApiResponse.success(body)
         ApiResponse<Object> wrapped = ApiResponse.of(
-                cn.realm.cloud.framework.common.enums.ErrorCode.SUCCESS.getCode(),
-                cn.realm.cloud.framework.common.enums.ErrorCode.SUCCESS.getMessage(),
+                ErrorCode.SUCCESS.getCode(),
+                ErrorCode.SUCCESS.getMessage(),
                 body);
 
         // 7. 注入 traceId（与 GlobalExceptionHandler 一致）
-        String traceId = currentTraceId();
-        if (traceId != null) {
+        String traceId = TraceContextAccessor.currentTraceId();
+        if (traceId != null && !traceId.isEmpty()) {
             wrapped = wrapped.withTraceId(traceId);
         }
 
@@ -231,14 +226,5 @@ public class GlobalResponseBodyAdvice implements ResponseBodyAdvice<Object> {
             return servletAttrs.getRequest();
         }
         return null;
-    }
-
-    /**
-     * 从 MDC 读取当前 traceId。
-     *
-     * <p>需配合 {@code TraceIdFilter} 使用；未启用时返回 {@code null}。
-     */
-    private String currentTraceId() {
-        return MDC.get(TRACE_ID_KEY);
     }
 }

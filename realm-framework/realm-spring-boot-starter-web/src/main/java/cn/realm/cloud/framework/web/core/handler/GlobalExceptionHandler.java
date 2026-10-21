@@ -4,12 +4,12 @@ import cn.realm.cloud.framework.common.base.api.ApiResponse;
 import cn.realm.cloud.framework.common.enums.ErrorCode;
 import cn.realm.cloud.framework.common.exception.BusinessException;
 import cn.realm.cloud.framework.common.exception.SystemException;
+import cn.realm.cloud.framework.common.trace.TraceContextAccessor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -51,13 +51,17 @@ import java.util.stream.Collectors;
  * <p><b>日志脱敏：</b>异常消息中可能含敏感信息（如密码、身份证），
  * 生产环境建议配合 {@code MaskingUtil} 脱敏或字段级日志过滤。
  *
- * <p><b>TraceId 注入：</b>从 MDC 读取 traceId 并注入 {@link ApiResponse}，
- * 便于全链路追踪（需配合 {@code TraceIdFilter} 使用）。
+ * <p><b>traceId 注入来源：</b>
+ * 通过 {@link TraceContextAccessor#currentTraceId()} 获取，
+ * 数据源为 OpenTelemetry {@code Span.current()}，
+ * 与 {@code TraceContextFilter} 写入的 {@code traceparent} 保持一致。
  *
  * <p><b>优先级：</b>{@link Order} 设为 {@code Ordered.HIGHEST_PRECEDENCE + 100}，
  * 确保业务异常处理器优先于 Spring Security、Spring Boot Actuator 的默认处理器。
  *
  * @author QI Guang
+ * @see GlobalResponseBodyAdvice
+ * @see TraceContextAccessor
  * @since 1.0.0
  */
 @RestControllerAdvice
@@ -70,11 +74,6 @@ public class GlobalExceptionHandler {
      * 用户侧通用错误消息（系统异常不暴露内部细节）。
      */
     private static final String USER_FACING_ERROR_MESSAGE = "系统繁忙，请稍后再试";
-
-    /**
-     * MDC 中 traceId 的 key。
-     */
-    private static final String TRACE_ID_KEY = "traceId";
 
     // ================================================================
     // 第一部分：业务/系统异常
@@ -272,7 +271,7 @@ public class GlobalExceptionHandler {
         log.warn("[handleNoHandlerFound] uri={}, method={}",
                 request.getRequestURI(), request.getMethod());
         return buildErrorResponse(HttpStatus.NOT_FOUND,
-                ErrorCode.PARAM_INVALID,
+                ErrorCode.NOT_FOUND,
                 "接口不存在：" + request.getRequestURI());
     }
 
@@ -315,8 +314,8 @@ public class GlobalExceptionHandler {
      * 构建业务失败响应（HTTP 200 + 业务 code）。
      */
     private ApiResponse<Void> buildApiResponse(ErrorCode errorCode, String message) {
-        return ApiResponse.of(errorCode.getCode(), message)
-                .withTraceId(currentTraceId());
+        ApiResponse<Void> body = ApiResponse.of(errorCode.getCode(), message);
+        return withTraceId(body);
     }
 
     /**
@@ -324,18 +323,26 @@ public class GlobalExceptionHandler {
      */
     private ResponseEntity<ApiResponse<Void>> buildErrorResponse(
             HttpStatus status, ErrorCode errorCode, String userMessage) {
-        ApiResponse<Void> body = ApiResponse.of(errorCode.getCode(), userMessage)
-                .withTraceId(currentTraceId());
-        return ResponseEntity.status(status).body(body);
+        ApiResponse<Void> body = ApiResponse.of(errorCode.getCode(), userMessage);
+        return ResponseEntity.status(status).body(withTraceId(body));
     }
 
     /**
-     * 从 MDC 读取当前 traceId。
+     * 注入当前 traceId（若存在）。
      *
-     * <p>需配合 {@code TraceIdFilter} 使用；未启用时返回 {@code null}。
+     * <p>数据源为 OpenTelemetry {@code Span.current()}，通过
+     * {@link TraceContextAccessor} 读取，与 {@code TraceContextFilter}
+     * 写入的 {@code traceparent} 保持一致。
+     *
+     * @param body 待注入的响应体
+     * @return 注入 traceId 后的响应体；若 traceId 为空则原样返回
      */
-    private String currentTraceId() {
-        return MDC.get(TRACE_ID_KEY);
+    private ApiResponse<Void> withTraceId(ApiResponse<Void> body) {
+        String traceId = TraceContextAccessor.currentTraceId();
+        if (traceId != null && !traceId.isEmpty()) {
+            return body.withTraceId(traceId);
+        }
+        return body;
     }
 
     /**

@@ -75,10 +75,11 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- 监控支持：SkyWalking 链路追踪 / Monitoring: SkyWalking tracing -->
+        <!-- OpenTelemetry API：仅编译期，运行时由 Java Agent 或 monitor starter 提供；不向下传递 -->
         <dependency>
-            <groupId>org.apache.skywalking</groupId>
-            <artifactId>apm-toolkit-trace</artifactId>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+            <scope>provided</scope>
         </dependency>
 
         <!-- 开发工具库：Lombok（代码简化） / Developer tooling: Lombok (boilerplate reduction) -->

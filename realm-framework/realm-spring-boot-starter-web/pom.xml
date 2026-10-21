@@ -17,11 +17,12 @@
     <artifactId>realm-spring-boot-starter-web</artifactId>
     <packaging>jar</packaging>
 
-    <!-- 项目信息：Web 框架能力（全局异常处理、API 日志、脱敏、错误码等） / Project info: web framework capabilities (global exception handling, API logging, desensitization, error codes, etc.) -->
+    <!-- 项目信息：Web 框架能力 / Project info: web framework capabilities -->
     <name>${project.artifactId}</name>
     <description>
-        Web 框架：全局异常处理、API 日志、脱敏、错误码等。
-        Web framework: global exception handling, API logging, desensitization, error codes, etc.
+        Web 框架：全局异常处理、API 日志、脱敏、错误码、W3C Trace Context 过滤器等。
+        Web framework: global exception handling, API logging, desensitization, error codes,
+        W3C Trace Context filter, etc.
     </description>
     <!-- 请替换为实际项目地址 / Replace with actual project URL -->
     <url>https://github.com/</url>
@@ -59,17 +60,14 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- OpenAPI 支持：Knife4j 与 SpringDoc / OpenAPI support: Knife4j & SpringDoc -->
+        <!-- OpenAPI 支持：Knife4j（已传递依赖 springdoc-openapi-starter-webmvc-ui） / OpenAPI: Knife4j (transitively includes springdoc) -->
         <dependency>
             <groupId>com.github.xiaoymin</groupId>
             <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-        </dependency>
 
         <!-- RPC 组件（可选：用于远程调用） / RPC starter (optional: for remote procedure calls) -->
+        <!-- 注意：确认 rpc starter 未反向依赖本模块，避免循环依赖 -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
             <artifactId>realm-spring-boot-starter-rpc</artifactId>
@@ -89,17 +87,46 @@
             <artifactId>jsoup</artifactId>
         </dependency>
 
-        <!-- 测试相关：Spring Boot Test 与 Mockito Inline / Testing: Spring Boot Test & Mockito Inline -->
+        <!-- OpenTelemetry API：编译期需要，运行时由 Java Agent 或 monitor starter 提供 -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- ============================================================ -->
+        <!-- 测试相关 / Testing                                            -->
+        <!-- ============================================================ -->
+
+        <!-- Spring Boot Test：包含 JUnit 5、AssertJ、Mockito、Hamcrest 等 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- OpenTelemetry SDK：测试期提供真实 SDK，避免 GlobalOpenTelemetry 为 no-op -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- OpenTelemetry SDK Testing：提供 InMemorySpanExporter，用于断言 Span 导出 -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-testing</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Mockito Inline：仅当项目使用 Mockito 4.x 时保留；Mockito 5.x 起已内置 -->
+        <!--
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-inline</artifactId>
             <scope>test</scope>
         </dependency>
+        -->
 
     </dependencies>
 

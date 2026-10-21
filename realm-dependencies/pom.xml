@@ -33,21 +33,21 @@
 
         <!-- Web 开发 / Web development -->
         <!-- SpringDoc OpenAPI -->
-        <springdoc.version>2.8.11</springdoc.version>
+        <springdoc.version>2.8.17</springdoc.version>
         <!-- Knife4j API UI -->
         <knife4j.version>4.5.0</knife4j.version>
 
         <!-- 数据库相关 / Database -->
         <!-- Druid 连接池 / Connection pool -->
-        <druid.version>1.2.27</druid.version>
+        <druid.version>1.2.28</druid.version>
         <!-- MyBatis 核心 / MyBatis core -->
         <mybatis.version>3.5.19</mybatis.version>
         <!-- MyBatis-Plus -->
-        <mybatis-plus.version>3.5.14</mybatis-plus.version>
+        <mybatis-plus.version>3.5.17</mybatis-plus.version>
         <!-- 联表查询扩展 / Join extension -->
-        <mybatis-plus-join.version>1.5.4</mybatis-plus-join.version>
+        <mybatis-plus-join.version>1.5.9</mybatis-plus-join.version>
         <!-- 动态数据源 / Dynamic datasource -->
-        <dynamic-datasource.version>4.3.1</dynamic-datasource.version>
+        <dynamic-datasource.version>4.5.0</dynamic-datasource.version>
         <!-- 数据翻译 / Data translation (Easy-Trans) -->
         <easy-trans.version>3.1.8</easy-trans.version>
         <!-- Redisson 分布式锁/缓存 / Distributed lock & cache -->
@@ -59,7 +59,7 @@
         <!-- openGauss 驱动 / openGauss driver -->
         <opengauss.jdbc.version>5.1.0</opengauss.jdbc.version>
         <!-- TDengine 时序数据库驱动 / Time-series DB driver -->
-        <taos.version>3.7.3</taos.version>
+        <taos.version>3.9.2</taos.version>
 
         <!-- 消息队列 / Message queue -->
         <!-- RocketMQ Spring Boot Starter -->
@@ -76,10 +76,9 @@
         <skywalking.version>9.7.0</skywalking.version>
         <!-- Spring Boot Admin -->
         <spring-boot-admin.version>3.5.9</spring-boot-admin.version>
-        <!-- OpenTracing API -->
-        <opentracing.version>0.33.0</opentracing.version>
-        <!-- OpenTelemetry -->
-        <opentelemetry.version>1.65.0</opentelemetry.version>
+
+        <!-- OpenTelemetry (OTel) -->
+        <opentelemetry.version>1.66.0</opentelemetry.version>
 
         <!-- 测试 / Testing -->
         <!-- H2 内存数据库 / H2 in-memory database -->
@@ -93,25 +92,27 @@
 
         <!-- 工作流 / Workflow -->
         <!-- Flowable 工作流引擎 / Workflow engine -->
-        <flowable.version>7.0.1</flowable.version>
+        <flowable.version>8.0.0</flowable.version>
 
         <!-- 工具类 / Utilities -->
         <!-- 验证码生成 / Captcha generator -->
         <anji-plus-captcha.version>1.4.0</anji-plus-captcha.version>
         <!-- HTML 解析 / HTML parser -->
-        <jsoup.version>1.21.2</jsoup.version>
+        <jsoup.version>1.23.2</jsoup.version>
         <!-- Lombok -->
-        <lombok.version>1.18.38</lombok.version>
+        <lombok.version>1.18.48</lombok.version>
         <!-- MapStruct 对象映射 / Object mapping -->
         <mapstruct.version>1.6.3</mapstruct.version>
         <!-- Lombok-MapStruct 绑定 / Lombok-MapStruct binding -->
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <!-- Hutool 5.x -->
-        <hutool-5.version>5.8.40</hutool-5.version>
+        <hutool-5.version>5.8.47</hutool-5.version>
         <!-- Hutool 6.x（扩展） / Hutool 6.x (extra) -->
         <hutool-6.version>6.0.0-M22</hutool-6.version>
         <!-- FastExcel（EasyExcel 替代） / FastExcel (EasyExcel alternative) -->
         <fastexcel.version>1.3.0</fastexcel.version>
+        <!-- Apache Fesod（FastExcel 的 Apache 继任者，孵化中） / Apache Fesod (Apache successor of FastExcel, incubating) -->
+        <fesod.version>2.0.2-incubating</fesod.version>
         <!-- Aviator 公式引擎 / Aviator expression engine -->
         <aviator.version>5.4.4</aviator.version>
         <!-- Velocity 模板引擎 / Template engine -->
@@ -119,7 +120,7 @@
         <!-- Fastjson 2.x（含 1.x 兼容） / Fastjson 2.x (with 1.x compatibility) -->
         <fastjson2.version>2.0.65</fastjson2.version>
         <!-- Google Guava -->
-        <guava.version>33.4.8-jre</guava.version>
+        <guava.version>33.7.1-jre</guava.version>
         <!-- 线程上下文传递 / Thread context propagation -->
         <transmittable-thread-local.version>2.14.5</transmittable-thread-local.version>
         <!-- Apache Commons Net（FTP 等） / FTP etc. -->
@@ -127,7 +128,7 @@
         <!-- Apache Commons Lang3 -->
         <commons-lang3.version>3.20.0</commons-lang3.version>
         <!-- JSch SFTP 客户端 / SFTP client -->
-        <jsch.version>2.27.3</jsch.version>
+        <jsch.version>2.28.7</jsch.version>
         <!-- Apache Tika（文件类型识别） / File type detection -->
         <tika-core.version>3.2.2</tika-core.version>
         <!-- IP2Region（离线 IP 定位） / Offline IP location -->
@@ -222,6 +223,7 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- OpenTelemetry 官方推荐用 BOM -->
             <dependency>
                 <groupId>io.opentelemetry</groupId>
                 <artifactId>opentelemetry-bom</artifactId>
@@ -516,22 +518,7 @@
                 <artifactId>apm-toolkit-webflux</artifactId>
                 <version>${skywalking.version}</version>
             </dependency>
-            <!-- OpenTracing -->
-            <dependency>
-                <groupId>io.opentracing</groupId>
-                <artifactId>opentracing-api</artifactId>
-                <version>${opentracing.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.opentracing</groupId>
-                <artifactId>opentracing-util</artifactId>
-                <version>${opentracing.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.opentracing</groupId>
-                <artifactId>opentracing-noop</artifactId>
-                <version>${opentracing.version}</version>
-            </dependency>
+
             <!-- Spring Boot Admin -->
             <dependency>
                 <groupId>de.codecentric</groupId>
@@ -651,6 +638,12 @@
                 <groupId>cn.idev.excel</groupId>
                 <artifactId>fastexcel</artifactId>
                 <version>${fastexcel.version}</version>
+            </dependency>
+            <!-- Apache Fesod（FastExcel 的 Apache 继任者，孵化中） / Apache Fesod (Apache successor of FastExcel, incubating) -->
+            <dependency>
+                <groupId>org.apache.fesod</groupId>
+                <artifactId>fesod-sheet</artifactId>
+                <version>${fesod.version}</version>
             </dependency>
             <!-- Aviator 公式引擎 / Aviator expression engine -->
             <dependency>

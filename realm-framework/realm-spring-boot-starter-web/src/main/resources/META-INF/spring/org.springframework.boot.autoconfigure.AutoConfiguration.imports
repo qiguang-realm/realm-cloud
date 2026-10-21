@@ -1,1 +1,2 @@
 cn.realm.cloud.framework.web.config.WebAutoConfiguration
+cn.realm.cloud.framework.web.config.TraceContextFilterAutoConfiguration

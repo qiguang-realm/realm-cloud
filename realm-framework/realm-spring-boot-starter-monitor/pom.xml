@@ -52,28 +52,32 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- OpenTracing 工具库 / OpenTracing utility library -->
+        <!-- OpenTelemetry API：编译期需要，运行时由 Java Agent 或本模块自动配置提供 -->
         <dependency>
-            <groupId>io.opentracing</groupId>
-            <artifactId>opentracing-util</artifactId>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+            <scope>provided</scope>
         </dependency>
 
-        <!-- SkyWalking 链路追踪工具包 / SkyWalking tracing toolkit -->
+        <!-- OpenTelemetry SDK：本模块负责初始化 TracerProvider，optional 不向下传递 -->
         <dependency>
-            <groupId>org.apache.skywalking</groupId>
-            <artifactId>apm-toolkit-trace</artifactId>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk</artifactId>
+            <optional>true</optional>
         </dependency>
 
-        <!-- SkyWalking Logback 日志集成 / SkyWalking Logback integration -->
+        <!-- OpenTelemetry OTLP 导出器：将 Trace 数据发送到 Collector -->
         <dependency>
-            <groupId>org.apache.skywalking</groupId>
-            <artifactId>apm-toolkit-logback-1.x</artifactId>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+            <optional>true</optional>
         </dependency>
 
-        <!-- SkyWalking OpenTracing 适配 / SkyWalking OpenTracing adapter -->
+        <!-- OpenTelemetry SDK 自动配置扩展：支持通过环境变量/系统属性配置 -->
         <dependency>
-            <groupId>org.apache.skywalking</groupId>
-            <artifactId>apm-toolkit-opentracing</artifactId>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-extension-autoconfigure</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- Micrometer 集成 Prometheus（optional） / Micrometer Prometheus registry (optional) -->
