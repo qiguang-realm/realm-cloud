@@ -26,7 +26,6 @@ import org.springframework.context.annotation.Bean;
  * {@link TraceContextFilterAutoConfiguration}，见该类文档。
  *
  * @author QI Guang
- * @since 1.0.0
  */
 @AutoConfiguration
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)

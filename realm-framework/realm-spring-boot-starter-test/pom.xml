@@ -29,7 +29,7 @@
         <!-- 通用基础库 / Common library -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-common</artifactId>
+            <artifactId>realm-core</artifactId>
         </dependency>
 
         <!-- 数据库相关组件（MyBatis 与 Redis，供集成测试使用） / Database related starters (MyBatis & Redis, for integration tests) -->
@@ -42,11 +42,7 @@
             <artifactId>realm-spring-boot-starter-redis</artifactId>
         </dependency>
 
-        <!-- 测试相关：Mockito Inline 与 Spring Boot Test / Testing: Mockito Inline & Spring Boot Test -->
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-inline</artifactId>
-        </dependency>
+        <!-- 测试相关：Spring Boot Test / Testing: Spring Boot Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

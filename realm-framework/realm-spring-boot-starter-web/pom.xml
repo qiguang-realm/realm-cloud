@@ -33,7 +33,7 @@
         <!-- 通用基础库 / Common library -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-common</artifactId>
+            <artifactId>realm-core</artifactId>
         </dependency>
 
         <!-- Spring Boot 配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional) -->
@@ -60,10 +60,16 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- OpenAPI 支持：Knife4j（已传递依赖 springdoc-openapi-starter-webmvc-ui） / OpenAPI: Knife4j (transitively includes springdoc) -->
+        <!-- OpenAPI 支持：Knife4j / OpenAPI: Knife4j -->
         <dependency>
             <groupId>com.github.xiaoymin</groupId>
             <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+        </dependency>
+        <!-- OpenAPI 支持：springdoc（显式声明，确保 @Schema 等 Swagger 注解可用） -->
+        <!-- OpenAPI: springdoc (explicit, ensures Swagger annotations like @Schema are available) -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>
 
         <!-- RPC 组件（可选：用于远程调用） / RPC starter (optional: for remote procedure calls) -->
@@ -91,7 +97,6 @@
         <dependency>
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-api</artifactId>
-            <scope>provided</scope>
         </dependency>
 
         <!-- ============================================================ -->
@@ -120,6 +125,7 @@
         </dependency>
 
         <!-- Mockito Inline：仅当项目使用 Mockito 4.x 时保留；Mockito 5.x 起已内置 -->
+        <!-- Mockito Inline: keep only for Mockito 4.x; built-in since Mockito 5.x -->
         <!--
         <dependency>
             <groupId>org.mockito</groupId>

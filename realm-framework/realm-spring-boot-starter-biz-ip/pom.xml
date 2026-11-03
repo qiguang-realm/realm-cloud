@@ -35,7 +35,7 @@
         <!-- 通用基础库 / Common library -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-common</artifactId>
+            <artifactId>realm-core</artifactId>
         </dependency>
 
         <!-- IP 地址查询库 / IP address lookup library -->

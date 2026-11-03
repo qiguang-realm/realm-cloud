@@ -1,0 +1,165 @@
+
+ADR-001-模块分包方案.
+一份有明确推荐倾向的架构决策记录（ADR）。
+
+最值得推荐的是 以 Spring Modulith 2.0 为核心、ArchUnit 作为补充的模块化单体方案。
+它不是某一条 ISO 条文，但它是 2026 年 Java 生态中，被领先工程组织以公开文档、架构决策记录（ADR）和生产案例反复验证的默认演进方向。
+
+Spring Modulith 2.0（辅以 ArchUnit）是唯一同时具备“一等模块抽象 + 声明式依赖白名单 + 运行时事件基础设施 + 构建门禁强制 + 大规模企业生产验证”的方案。
+它不挂靠某条 ISO 编号，但它是 2026 年 Java 生态中，从 Shopify 到 KakaoBank、从 Spring 官方到 JetBrains 工具链共同指向的工程共识。
+
+一、realm-module-system-server 根包全景
+
+假设启动类为 cn.realm.cloud.system.Application，根包下每个直接子包就是一个 Modulith 模块：
+
+src/main/java/cn/realm/cloud/system/server/
+│
+├── Application.java                    # [必须] @SpringBootApplication 启动类
+│                                       #        Modulith 以本包为根，直接子包 = 模块
+│
+├── shared/                             # 共享内核（Type.OPEN，所有模块可依赖）
+│   ├── package-info.java               # [必须] @ApplicationModule(type = OPEN)
+│   ├── PageResult.java                 # [必须] 通用分页结果 record
+│   ├── ApiResult.java                  # [可选] 统一响应体（项目已有则复用）
+│   └── exception/
+│       └── BusinessException.java      # [可选] 统一业务异常基类
+│
+├── user/                               # 用户模块
+│   ├── package-info.java               # allowedDependencies = {"organization", "permission", "shared"}
+│   ├── UserDto.java                    # 跨模块只读契约
+│   ├── UserFacade.java                 # 跨模块门面
+│   ├── events/
+│   │   ├── package-info.java           # @NamedInterface("events")
+│   │   └── UserCreatedEvent.java
+│   └── internal/ ...                   # 见上一轮细化，此处省略
+│
+├── role/                               # 角色模块
+│   ├── package-info.java               # allowedDependencies = {"permission", "user::events", "shared"}
+│   ├── RoleDto.java
+│   ├── RoleFacade.java
+│   ├── events/
+│   │   ├── package-info.java
+│   │   └── RoleAssignedEvent.java
+│   └── internal/ ...
+│
+├── permission/                         # 权限模块（菜单、按钮、API 权限点）
+│   ├── package-info.java               # allowedDependencies = {"shared"}
+│   ├── PermissionDto.java
+│   ├── PermissionFacade.java
+│   └── internal/ ...
+│
+├── organization/                       # 组织架构模块（部门 + 岗位）
+│   ├── package-info.java               # allowedDependencies = {"shared"}
+│   ├── DeptDto.java / PostDto.java
+│   ├── OrganizationFacade.java
+│   ├── events/
+│   │   ├── package-info.java
+│   │   └── DeptDeletedEvent.java
+│   └── internal/ ...
+│
+├── dict/                               # 数据字典模块
+│   ├── package-info.java               # allowedDependencies = {"shared"}
+│   ├── DictFacade.java
+│   └── internal/ ...
+│
+└── setting/                            # 系统配置模块（原 config，建议改名）
+    ├── package-info.java               # allowedDependencies = {"shared"}
+    ├── SettingFacade.java
+    └── internal/ ...
+
+
+二、user 模块完整目录树
+
+src/main/java/cn/realm/cloud/system/server/
+│
+├── Application.java                          # [必须] @SpringBootApplication 启动类；
+│                                             #        Modulith 以它的包为根包，直接子包即模块
+│
+├── shared/                                   # [推荐] 共享内核模块，所有模块可依赖
+│   ├── package-info.java                     # [必须] @ApplicationModule(type = OPEN)
+│   ├── PageResult.java                       # [必须] 通用分页结果 record
+│   └── exception/                            # [可选] 统一业务异常，多模块共用
+│       └── BusinessException.java
+│
+└── user/                                     # 用户模块（Modulith 模块根包）
+    │
+    ├── package-info.java                     # [必须] @ApplicationModule(allowedDependencies = {...})
+    │                                         #        声明本模块可依赖哪些模块
+    ├── UserDto.java                          # [必须] 跨模块只读契约（record，不可变）
+    ├── UserFacade.java                       # [必须] 跨模块同步调用门面接口
+    │                                         #        根包类型对其他模块可见 = 公共 API
+    │
+    ├── events/                               # 对外事件契约
+    │   ├── package-info.java                 # [必须] @NamedInterface("events")
+    │   │                                     #        其他模块通过 "user::events" 依赖此子包
+    │   ├── UserCreatedEvent.java             # [必须] 用户创建事件 record
+    │   └── UserStatusChangedEvent.java       # [可选] 用户状态变更事件 record
+    │
+    └── internal/                             # 以下全部对其他模块不可见
+        │                                     # Modulith verify() 强制拒绝跨模块访问
+        │
+        ├── UserFacadeImpl.java               # [必须] 实现根包 UserFacade；
+        │                                     #        注入 UserService，把 UserDO 映射为 UserDto；
+        │                                     #        放 internal 而非根包，避免实现类成为公共 API
+        │
+        ├── application/                      # 应用服务层：用例编排
+        │   ├── UserService.java              # [必须] 内部应用服务接口，注入到 Controller 和 FacadeImpl
+        │   └── UserServiceImpl.java          # [必须] 实现；注入 UserRepository + ApplicationEventPublisher；
+        │                                     #        不 extends ServiceImpl，不直接依赖 UserMapper
+        │
+        ├── persistence/                      # 持久化层：收拢 MyBatis-Plus
+        │   ├── UserDO.java                   # [必须] 持久化对象（原 User 改名），保留 @TableName
+        │   ├── UserMapper.java               # [必须] MyBatis-Plus Mapper，泛型 BaseMapper<UserDO>
+        │   ├── UserRepository.java           # [推荐] 仓储接口，业务语义方法签名，不暴露 Wrapper
+        │   ├── UserRepositoryImpl.java       # [推荐] 实现；唯一 import Wrappers/ServiceImpl 的类
+        │   └── UserConverter.java            # [必须] UserDO ↔ UserDto 转换（供 UserFacadeImpl 使用）
+        │
+        └── api/                              # 入站 HTTP 适配器层
+            │
+            ├── common/                       # [可选] 本模块 API 层共用组件
+            │   └── UserExceptionHandler.java # [可选] @RestControllerAdvice，把 UserNotFound 转为统一响应
+            │
+            ├── web/                          # 浏览器客户端大类
+            │   └── admin/                    # 管理后台（RBAC 权限模型）
+            │       ├── UserAdminController.java      # [必须] 管理端入口，@RequestMapping("/admin/iam/user")
+            │       ├── converter/
+            │       │   └── UserAdminConverter.java   # [必须] Request/Response ↔ UserDO 转换
+            │       └── dto/                          # 管理端 HTTP 契约，不跨端复用
+            │           ├── UserCreateRequest.java    # [必须] 创建用户请求
+            │           ├── UserUpdateRequest.java    # [必须] 更新用户请求
+            │           ├── UserPageRequest.java      # [必须] 分页查询请求
+            │           └── UserResponse.java         # [必须] 用户详情/列表响应（含管理字段）
+            │
+            └── app/                          # 非管理端（App/小程序/H5）
+                ├── UserAppController.java    # [必须] App 端入口，@RequestMapping("/app/iam/user")
+                ├── converter/
+                │   └── UserAppConverter.java # [必须] Request/Response ↔ UserDO 转换，含手机号脱敏
+                └── dto/                      # App 端 HTTP 契约，字段比管理端窄
+                    ├── UserProfileUpdateRequest.java  # [必须] 更新个人资料请求
+                    └── UserProfileResponse.java       # [必须] 个人资料响应（仅当前用户可见字段）
+
+三、测试源码目录
+
+src/test/java/cn/realm/cloud/system/server/
+│
+├── ModularityTest.java                    # [必须] ApplicationModules.of(Application.class).verify()
+│                                          #        模块边界门禁：循环依赖、internal 泄漏、allowedDependencies
+│
+├── arch/
+│   └── ArchitectureTest.java              # [推荐] ArchUnit 补充规则，见下方示例
+│
+└── user/
+    └── internal/
+        ├── application/
+        │   └── UserServiceImplTest.java   # [推荐] mock UserRepository 的单元测试，不启动数据库
+        │
+        └── api/
+            └── UserAdminControllerTest.java # [可选] @WebMvcTest 层测试
+
+在国际主流的架构指南中，Controller → Service → Repository 的分层是普遍推荐的标准结构。
+
+Google 的架构指南明确推荐使用 Repository 模式，主张将数据访问细节隐藏在 Repository 之后，让上层代码只与 Repository 交互。
+在 Spring 生态的规范中，分层架构（Controller → Service → Repository）常被视为“不可协商”的底线，业务逻辑应集中在 Service 层，持久化细节交由 Repository 处理。
+
+
+想知道在方向一（国际主流 Request/Response）和方向二（国内惯例 Req/Resp + VO）之间更推荐哪一种。

@@ -49,27 +49,23 @@
             <artifactId>realm-module-system-api</artifactId>
             <version>${revision}</version>
         </dependency>
-        <!-- Infra 模块 API（默认注释，如需调用 infra 服务请取消注释） / Infra module API (commented out by default; uncomment to call infra services) -->
-        <!--
+        <!-- Infra 模块 API / Infra module API -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
             <artifactId>realm-module-infra-api</artifactId>
             <version>${revision}</version>
         </dependency>
-        -->
 
         <!-- 业务组件：数据权限控制 / Business components: data permission control -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
             <artifactId>realm-spring-boot-starter-biz-data-permission</artifactId>
         </dependency>
-        <!-- 业务组件：多租户支持（默认注释，如需多租户请取消注释） / Business components: multi-tenancy (commented out by default) -->
-        <!--
+        <!-- 业务组件：多租户支持 / Business components: multi-tenancy -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
             <artifactId>realm-spring-boot-starter-biz-tenant</artifactId>
         </dependency>
-        -->
         <!-- 业务组件：IP 地理定位（基于 ip2region） / Business components: IP geolocation (based on ip2region) -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
@@ -112,13 +108,11 @@
             <groupId>cn.realm.cloud</groupId>
             <artifactId>realm-spring-boot-starter-job</artifactId>
         </dependency>
-        <!-- 消息队列（默认注释，如需 MQ 请取消注释） / Message queue (commented out by default) -->
-        <!--
+        <!-- 消息队列 / Message queue -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
             <artifactId>realm-spring-boot-starter-mq</artifactId>
         </dependency>
-        -->
 
         <!-- 工具类：Excel 导入导出 / Utilities: Excel import/export -->
         <dependency>
@@ -180,6 +174,25 @@
         <dependency>
             <groupId>cn.realm.cloud</groupId>
             <artifactId>realm-spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Spring Modulith 核心：@ApplicationModule / @NamedInterface / ApplicationModules -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-starter-core</artifactId>
+        </dependency>
+
+        <!-- Spring Modulith 事件 API：@ApplicationModuleListener 所在的构件 -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-events-api</artifactId>
+        </dependency>
+
+        <!-- Spring Modulith 测试支持：ApplicationModules.verify() -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
 

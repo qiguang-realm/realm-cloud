@@ -34,10 +34,10 @@
         <!-- 通用基础库 / Common library -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-common</artifactId>
+            <artifactId>realm-core</artifactId>
         </dependency>
 
-        <!-- Spring Boot AOP starter / Spring Boot AOP starter -->
+        <!-- Spring Boot AOP starter：为操作日志等切面能力提供 AOP 支持 / Spring Boot AOP starter: AOP support for operation log and other aspects -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>
@@ -56,7 +56,7 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Spring Security 核心 / Spring Security core -->
+        <!-- Spring Security 核心：认证与授权 / Spring Security core: authentication & authorization -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
@@ -78,13 +78,15 @@
         </dependency>
         -->
 
-        <!-- 工具类库：Google Guava / Utility libraries: Google Guava -->
+        <!-- 工具类库：Google Guava（集合、缓存、并发等工具） / Utility libraries: Google Guava (collections, cache, concurrency, etc.) -->
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
         </dependency>
 
         <!-- 操作日志组件：BizLog SDK / Operation log component: BizLog SDK -->
+        <!-- 基于注解实现，解决的问题是：「谁」在「什么时间」对「什么」做了「什么事」 -->
+        <!-- Annotation-based; solves the question: "who" did "what" to "what" at "what time" -->
         <dependency>
             <groupId>io.github.mouzt</groupId>
             <artifactId>bizlog-sdk</artifactId>

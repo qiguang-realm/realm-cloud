@@ -89,7 +89,7 @@ spring:
     redis:
       host: 400-infra.server.cn
       port: 6379
-      database: 1
+      database: 6
       # password: 123456 # 生产建议开启
 
   # ---- RabbitMQ ----

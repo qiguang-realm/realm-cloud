@@ -29,7 +29,7 @@
         <!-- 核心工具：模块内通用的工具函数 / Core utilities: common utility functions used across the module -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-common</artifactId>
+            <artifactId>realm-core</artifactId>
         </dependency>
 
         <!-- 安全集成：提供当前用户与租户信息，用于租户隔离 / Security integration: current user & tenant info for tenant isolation -->

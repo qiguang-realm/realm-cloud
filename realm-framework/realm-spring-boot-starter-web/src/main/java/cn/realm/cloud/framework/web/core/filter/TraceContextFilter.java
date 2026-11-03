@@ -121,7 +121,6 @@ import java.util.Collections;
  * @author QI Guang
  * @see TraceContextProperties
  * @see GlobalOpenTelemetry
- * @since 1.0.0
  */
 public class TraceContextFilter extends OncePerRequestFilter {
 

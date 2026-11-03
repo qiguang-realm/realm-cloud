@@ -22,7 +22,6 @@ import java.lang.annotation.*;
  * }</pre>
  *
  * @author QI Guang
- * @since 1.0.0
  */
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)

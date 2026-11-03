@@ -29,13 +29,19 @@
         <!-- 通用基础库：项目通用工具和基础类 / Common library: shared utilities and base classes -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-common</artifactId>
+            <artifactId>realm-core</artifactId>
         </dependency>
 
         <!-- Redis 客户端增强：支持分布式锁与数据结构 / Redis client enhancement: distributed locks and data structures -->
         <dependency>
             <groupId>org.redisson</groupId>
             <artifactId>redisson-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- 显式引入与 Spring Boot 3.5 / Spring Data Redis 3.5 匹配的适配模块 -->
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson-spring-data-35</artifactId>
         </dependency>
 
         <!-- Spring Cache 自动化配置 / Spring Cache auto-configuration -->

@@ -32,7 +32,7 @@
         <!-- 通用工具：各模块共用的核心工具库 / Common utilities: core utility library used across all modules -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-common</artifactId>
+            <artifactId>realm-core</artifactId>
         </dependency>
 
         <!-- 安全集成（provided：WebSocket 会话与当前登录用户关联，见 WebSocketSessionManagerImpl；采用 provided 避免强制使用方引入安全模块；选择让 websocket 依赖 security 而非反向扩展，以保持 websocket 组件内聚、降低概念负担） / Security integration (provided: WebSocket sessions are bound to the current login user; provided keeps security optional for consumers; websocket depends on security to keep the component cohesive) -->

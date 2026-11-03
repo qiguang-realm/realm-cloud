@@ -47,23 +47,29 @@
         <!-- 联表查询扩展 / Join extension -->
         <mybatis-plus-join.version>1.5.9</mybatis-plus-join.version>
         <!-- 动态数据源 / Dynamic datasource -->
-        <dynamic-datasource.version>4.5.0</dynamic-datasource.version>
+        <dynamic-datasource.version>4.6.0</dynamic-datasource.version>
         <!-- 数据翻译 / Data translation (Easy-Trans) -->
         <easy-trans.version>3.1.8</easy-trans.version>
-        <!-- Redisson 分布式锁/缓存 / Distributed lock & cache -->
-        <redisson.version>3.51.0</redisson.version>
+        <!--
+            Redisson：4.7.0 默认捆绑 redisson-spring-data-41（适配 Spring Data Redis 4.x），
+            必须排除后显式引入 redisson-spring-data-35 以适配 Spring Boot 3.5.x。
+        -->
+        <redisson.version>4.7.0</redisson.version>
         <!-- 达梦数据库驱动 / Dameng DB driver -->
         <dm8.jdbc.version>8.1.3.140</dm8.jdbc.version>
         <!-- 人大金仓驱动 / Kingbase driver -->
-        <kingbase.jdbc.version>8.6.0</kingbase.jdbc.version>
+        <kingbase.jdbc.version>9.0.1.jre7</kingbase.jdbc.version>
         <!-- openGauss 驱动 / openGauss driver -->
         <opengauss.jdbc.version>5.1.0</opengauss.jdbc.version>
         <!-- TDengine 时序数据库驱动 / Time-series DB driver -->
         <taos.version>3.9.2</taos.version>
+        <!-- IoTDB 时序数据库驱动 / IoTDB time-series DB driver -->
+        <!-- 锁定 2.0.8：暂不升级 2.0.10/2.0.11，其 TablePreparedStatement.execute 不设置 ResultSet，会导致 Mapper 的 SELECT 为空、COUNT 为 null / Pinned to 2.0.8: 2.0.10/2.0.11 break ResultSet population in TablePreparedStatement.execute (Mapper SELECT empty, COUNT null) -->
+        <iotdb.version>2.0.8</iotdb.version>
 
         <!-- 消息队列 / Message queue -->
         <!-- RocketMQ Spring Boot Starter -->
-        <rocketmq-spring.version>2.3.4</rocketmq-spring.version>
+        <rocketmq-spring.version>2.3.6</rocketmq-spring.version>
 
         <!-- 定时任务 & 服务保障 / Scheduling & service protection -->
         <!-- XXL-JOB 分布式任务调度 / Distributed job scheduler -->
@@ -78,7 +84,7 @@
         <spring-boot-admin.version>3.5.9</spring-boot-admin.version>
 
         <!-- OpenTelemetry (OTel) -->
-        <opentelemetry.version>1.66.0</opentelemetry.version>
+        <opentelemetry.version>1.67.0</opentelemetry.version>
 
         <!-- 测试 / Testing -->
         <!-- H2 内存数据库 / H2 in-memory database -->
@@ -86,12 +92,10 @@
         <!-- 随机 POJO 生成 / Random POJO generator -->
         <podam.version>8.0.2.RELEASE</podam.version>
         <!-- Jedis Mock（Redis 模拟） / Redis mock -->
-        <jedis-mock.version>1.1.11</jedis-mock.version>
-        <!-- Mockito 内联支持（final/static） / Inline support -->
-        <mockito-inline.version>5.2.0</mockito-inline.version>
+        <jedis-mock.version>1.1.19</jedis-mock.version>
 
         <!-- 工作流 / Workflow -->
-        <!-- Flowable 工作流引擎 / Workflow engine -->
+        <!-- Flowable 工作流引擎 / Workflow engine（8.0.0 与 Spring Boot 3.5 实测兼容） -->
         <flowable.version>8.0.0</flowable.version>
 
         <!-- 工具类 / Utilities -->
@@ -101,7 +105,7 @@
         <jsoup.version>1.23.2</jsoup.version>
         <!-- Lombok -->
         <lombok.version>1.18.48</lombok.version>
-        <!-- MapStruct 对象映射 / Object mapping -->
+        <!-- MapStruct 对象映射 / Object mapping（保留稳定版，不跟 Beta） -->
         <mapstruct.version>1.6.3</mapstruct.version>
         <!-- Lombok-MapStruct 绑定 / Lombok-MapStruct binding -->
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
@@ -109,28 +113,26 @@
         <hutool-5.version>5.8.47</hutool-5.version>
         <!-- Hutool 6.x（扩展） / Hutool 6.x (extra) -->
         <hutool-6.version>6.0.0-M22</hutool-6.version>
-        <!-- FastExcel（EasyExcel 替代） / FastExcel (EasyExcel alternative) -->
-        <fastexcel.version>1.3.0</fastexcel.version>
         <!-- Apache Fesod（FastExcel 的 Apache 继任者，孵化中） / Apache Fesod (Apache successor of FastExcel, incubating) -->
-        <fesod.version>2.0.2-incubating</fesod.version>
+        <fesod.version>2.1.0-incubating</fesod.version>
         <!-- Aviator 公式引擎 / Aviator expression engine -->
         <aviator.version>5.4.4</aviator.version>
         <!-- Velocity 模板引擎 / Template engine -->
         <velocity.version>2.4.1</velocity.version>
-        <!-- Fastjson 2.x（含 1.x 兼容） / Fastjson 2.x (with 1.x compatibility) -->
-        <fastjson2.version>2.0.65</fastjson2.version>
+        <!-- Fastjson 2.x 核心库 / Fastjson2 core only  -->
+        <fastjson2.version>2.0.66</fastjson2.version>
         <!-- Google Guava -->
         <guava.version>33.7.1-jre</guava.version>
         <!-- 线程上下文传递 / Thread context propagation -->
         <transmittable-thread-local.version>2.14.5</transmittable-thread-local.version>
         <!-- Apache Commons Net（FTP 等） / FTP etc. -->
-        <commons-net.version>3.11.1</commons-net.version>
-        <!-- Apache Commons Lang3 -->
+        <commons-net.version>3.13.0</commons-net.version>
+        <!-- Apache Commons Lang3（3.20.0 修复 CVE-2025-48924） / Commons Lang3 (3.20.0 fixes CVE-2025-48924) -->
         <commons-lang3.version>3.20.0</commons-lang3.version>
         <!-- JSch SFTP 客户端 / SFTP client -->
         <jsch.version>2.28.7</jsch.version>
         <!-- Apache Tika（文件类型识别） / File type detection -->
-        <tika-core.version>3.2.2</tika-core.version>
+        <tika-core.version>3.3.1</tika-core.version>
         <!-- IP2Region（离线 IP 定位） / Offline IP location -->
         <ip2region.version>2.7.0</ip2region.version>
         <!-- 业务日志 SDK / Business log SDK -->
@@ -138,11 +140,11 @@
         <!-- Reflections（反射扫描） / Reflection scanning -->
         <reflections.version>0.10.2</reflections.version>
         <!-- Netty -->
-        <netty.version>4.2.4.Final</netty.version>
+        <netty.version>4.2.18.Final</netty.version>
         <!-- Eclipse Paho MQTT 客户端 / MQTT client -->
         <mqtt.version>1.2.5</mqtt.version>
         <!-- Vert.x（异步框架） / Async framework -->
-        <vertx.version>4.5.13</vertx.version>
+        <vertx.version>4.5.26</vertx.version>
         <!-- PF4J Spring 集成 / PF4J Spring integration -->
         <pf4j-spring.version>0.9.0</pf4j-spring.version>
 
@@ -151,10 +153,14 @@
         <!-- Eclipse Californium（CoAP 协议） / CoAP -->
         <californium.version>3.14.0</californium.version>
         <!-- j2mod（Modbus 协议） / Modbus -->
-        <j2mod.version>3.3.0</j2mod.version>
+        <j2mod.version>3.4.0</j2mod.version>
         <!-- 支付宝 SDK / Alipay SDK -->
-        <alipay-sdk-java.version>4.40.865.ALL</alipay-sdk-java.version>
-        <!-- Bouncy Castle（加密库） / Crypto library -->
+        <alipay-sdk-java.version>4.40.1014.ALL</alipay-sdk-java.version>
+        <!--
+            Bouncy Castle（统一版本，避免冲突） / Crypto library (fix version conflicts)
+            锁定原因：weixin-java 传递依赖的 bouncycastle 使用版本范围，
+            Maven 可能自动升级到 1.80.2 导致 Fat Jar 启动失败，此处强制锁定 1.80。
+        -->
         <bouncycastle.version>1.80</bouncycastle.version>
         <!-- 敏感词检测（Trie） / Sensitive word detection -->
         <sensitive-word.version>0.29.5</sensitive-word.version>
@@ -163,7 +169,7 @@
 
         <!-- 三方云服务 / Third-party cloud services -->
         <!-- AWS SDK（S3 等） / AWS SDK (S3 etc.) -->
-        <awssdk.version>2.30.14</awssdk.version>
+        <awssdk.version>2.55.5</awssdk.version>
         <!-- JustAuth（第三方登录） / OAuth login -->
         <justauth.version>1.16.7</justauth.version>
         <!-- JustAuth Spring Boot Starter -->
@@ -172,14 +178,16 @@
         <jimureport.version>2.5.4</jimureport.version>
         <!-- 积木 BI / JimuBI -->
         <jimubi.version>2.5.4</jimubi.version>
-        <!-- 微信 Java SDK / WeChat Java SDK -->
-        <weixin-java.version>4.7.7-20250808.182223</weixin-java.version>
+        <!-- 微信 Java SDK / WeChat Java SDK（保留稳定版，不跟时间戳快照） -->
+        <weixin-java.version>4.8.0</weixin-java.version>
 
         <!-- 自定义版本 / Custom versions -->
         <!-- Apache PDFBox（PDF 处理） / PDF processing -->
         <pdfbox.version>3.0.8</pdfbox.version>
         <!-- Univocity（CSV/TSV 解析） / CSV/TSV parsers -->
         <univocity-parsers.version>2.9.1</univocity-parsers.version>
+        <!-- Spring Modulith BOM -->
+        <spring-modulith.version>2.0.8</spring-modulith.version>
     </properties>
 
     <!-- 依赖管理（此处仅声明版本，不会实际引入依赖；子模块引用时无需指定版本） / Dependency management (versions only; no actual imports) -->
@@ -194,6 +202,16 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+
+            <!-- OpenTelemetry 官方推荐用 BOM（比逐条声明更简洁） -->
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-bom</artifactId>
+                <version>${opentelemetry.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
@@ -201,20 +219,7 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            <dependency>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-dependencies</artifactId>
-                <version>${spring-cloud.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>com.alibaba.cloud</groupId>
-                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
-                <version>${spring-cloud-alibaba.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
+
             <!-- Spring AI BOM：统一管理 spring-ai-starter-* 系列依赖 -->
             <dependency>
                 <groupId>org.springframework.ai</groupId>
@@ -223,11 +228,28 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            <!-- OpenTelemetry 官方推荐用 BOM -->
+
             <dependency>
-                <groupId>io.opentelemetry</groupId>
-                <artifactId>opentelemetry-bom</artifactId>
-                <version>${opentelemetry.version}</version>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                <version>${spring-cloud-alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Spring Modulith BOM：统一管理 spring-modulith-starter-* 系列依赖 -->
+            <dependency>
+                <groupId>org.springframework.modulith</groupId>
+                <artifactId>spring-modulith-bom</artifactId>
+                <version>${spring-modulith.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -322,6 +344,9 @@
                 <artifactId>druid-spring-boot-3-starter</artifactId>
                 <version>${druid.version}</version>
             </dependency>
+            <!--
+                注意：必须显式声明 mybatis 版本，避免 flowable 与 mybatis-plus 传递引入的 mybatis 版本不一致。
+            -->
             <dependency>
                 <groupId>org.mybatis</groupId>
                 <artifactId>mybatis</artifactId>
@@ -407,13 +432,19 @@
                 <version>${revision}</version>
             </dependency>
             <!--
-                Redisson：3.51.0 默认捆绑 redisson-spring-data-35，与 Spring Boot 3.5.x 兼容。
-                升级到 Redisson 4.x 时，必须改为排除 redisson-spring-data-41 并显式引入 redisson-spring-data-35。
+                Redisson：4.7.x 默认捆绑 redisson-spring-data-41（适配 Spring Data Redis 4.x），
+                必须排除后显式引入 redisson-spring-data-35，以适配 Spring Boot 3.5.x。
             -->
             <dependency>
                 <groupId>org.redisson</groupId>
                 <artifactId>redisson-spring-boot-starter</artifactId>
                 <version>${redisson.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.redisson</groupId>
+                        <artifactId>redisson-spring-data-41</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.redisson</groupId>
@@ -441,6 +472,12 @@
                 <groupId>com.taosdata.jdbc</groupId>
                 <artifactId>taos-jdbcdriver</artifactId>
                 <version>${taos.version}</version>
+            </dependency>
+            <!-- IoTDB 时序数据库驱动 / IoTDB time-series DB driver -->
+            <dependency>
+                <groupId>org.apache.iotdb</groupId>
+                <artifactId>iotdb-jdbc</artifactId>
+                <version>${iotdb.version}</version>
             </dependency>
 
             <!-- 微服务与 RPC / Microservices & RPC -->
@@ -536,28 +573,13 @@
                 <groupId>cn.realm.cloud</groupId>
                 <artifactId>realm-spring-boot-starter-test</artifactId>
                 <version>${revision}</version>
-                <scope>test</scope>
             </dependency>
-            <dependency>
-                <groupId>org.mockito</groupId>
-                <artifactId>mockito-inline</artifactId>
-                <version>${mockito-inline.version}</version>
-            </dependency>
-            <!-- 显式声明版本，避免因 BOM 导入失败导致版本无法解析（排除 asm 与 mockito-core，统一由父 POM 管理） / Explicit version to avoid resolution failure if BOM import fails (exclude asm & mockito-core, managed by parent) -->
+
+            <!-- 显式声明版本，避免 BOM 导入异常时版本无法解析；版本与传递依赖统一由 spring-boot-dependencies 管理 -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-starter-test</artifactId>
                 <version>${spring-boot.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <artifactId>asm</artifactId>
-                        <groupId>org.ow2.asm</groupId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.mockito</groupId>
-                        <artifactId>mockito-core</artifactId>
-                    </exclusion>
-                </exclusions>
             </dependency>
             <dependency>
                 <groupId>com.h2database</groupId>
@@ -590,7 +612,7 @@
             <!-- 工具类库（Realm 通用 + 第三方） / Utility libraries -->
             <dependency>
                 <groupId>cn.realm.cloud</groupId>
-                <artifactId>realm-common</artifactId>
+                <artifactId>realm-core</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
@@ -633,12 +655,7 @@
                 <artifactId>hutool-extra</artifactId>
                 <version>${hutool-6.version}</version>
             </dependency>
-            <!-- FastExcel -->
-            <dependency>
-                <groupId>cn.idev.excel</groupId>
-                <artifactId>fastexcel</artifactId>
-                <version>${fastexcel.version}</version>
-            </dependency>
+
             <!-- Apache Fesod（FastExcel 的 Apache 继任者，孵化中） / Apache Fesod (Apache successor of FastExcel, incubating) -->
             <dependency>
                 <groupId>org.apache.fesod</groupId>
@@ -675,17 +692,17 @@
                 <artifactId>velocity-engine-core</artifactId>
                 <version>${velocity.version}</version>
             </dependency>
-            <!-- Fastjson2（含 fastjson 1.x 兼容实现） / Fastjson2 (with fastjson 1.x compatibility) -->
+
+            <!--
+                Fastjson2 核心库（包名 com.alibaba.fastjson2），不提供 com.alibaba:fastjson 1.x 兼容包。
+                1.x 传递依赖由各依赖上的 <exclusion> 精确拦截（easy-trans / rocketmq / alipay / JustAuth / jimureport / jimubi）。
+            -->
             <dependency>
                 <groupId>com.alibaba.fastjson2</groupId>
                 <artifactId>fastjson2</artifactId>
                 <version>${fastjson2.version}</version>
             </dependency>
-            <dependency>
-                <groupId>com.alibaba</groupId>
-                <artifactId>fastjson</artifactId>
-                <version>${fastjson2.version}</version>
-            </dependency>
+
             <!-- Guava -->
             <dependency>
                 <groupId>com.google.guava</groupId>
@@ -704,7 +721,7 @@
                 <artifactId>commons-net</artifactId>
                 <version>${commons-net.version}</version>
             </dependency>
-            <!-- commons-lang3 -->
+            <!-- commons-lang3（3.20.0 修复 CVE-2025-48924） / commons-lang3 (3.20.0 fixes CVE-2025-48924) -->
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
@@ -775,7 +792,11 @@
                 <artifactId>wx-java-miniapp-spring-boot-starter</artifactId>
                 <version>${weixin-java.version}</version>
             </dependency>
-            <!-- Bouncy Castle（统一版本，避免冲突） / Bouncy Castle (fix version conflicts) -->
+            <!--
+                Bouncy Castle（统一版本，避免冲突） / Bouncy Castle (fix version conflicts)
+                锁定原因：weixin-java 传递依赖的 bouncycastle 使用版本范围，
+                Maven 可能自动升级到 1.80.2 导致 Fat Jar 启动失败，此处强制锁定 1.80。
+            -->
             <dependency>
                 <groupId>org.bouncycastle</groupId>
                 <artifactId>bcprov-jdk18on</artifactId>

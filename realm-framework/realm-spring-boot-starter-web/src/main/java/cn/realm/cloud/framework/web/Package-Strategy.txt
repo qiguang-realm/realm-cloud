@@ -1,0 +1,159 @@
+cn.realm.cloud.framework.web
+├── autoconfigure/            # @AutoConfiguration 类，全部条件装配
+├── exception/                # GlobalExceptionHandler + ProblemDetail 映射
+├── trace/                    # TraceContextFilter + 请求上下文
+├── logging/                  # 请求/响应日志 + 脱敏机制
+├── versioning/               # 版本解析 Resolver
+├── pagination/               # PageParam Resolver
+├── web/                      # WebMvcConfigurer 默认配置（CORS、响应头）
+└── properties/               # @ConfigurationProperties
+
+
+
+cn.realm.cloud.framework.web
+│
+├── autoconfigure/
+│   ├── WebAutoConfiguration.java
+│   │   @AutoConfiguration
+│   │   @ConditionalOnWebApplication(type = SERVLET)
+│   │   # 总入口；通过 @Import 聚合各子配置，每个子配置独立 @ConditionalOnProperty
+│   │   依据：Spring Boot 官方要求自动配置类使用 @AutoConfiguration 并置于独立包[reference:1]
+│   ├── ProblemDetailAutoConfiguration.java
+│   │   @ConditionalOnProperty(prefix = "realm.web.error", name = "format",
+│   │                            havingValue = "problem-detail", matchIfMissing = true)
+│   │   # 注册 GlobalExceptionHandler + ProblemDetailFactory
+│   ├── ApiResponseAutoConfiguration.java
+│   │   @ConditionalOnProperty(prefix = "realm.web.error", name = "format",
+│   │                            havingValue = "api-response")
+│   │   # 注册 ResponseBodyAdvice 包装器（见 response 子包），与 ProblemDetail 路径互斥
+│   ├── TraceAutoConfiguration.java
+│   │   @ConditionalOnClass(OpenTelemetry.class)
+│   │   @ConditionalOnProperty(prefix = "realm.web.trace", name = "enabled",
+│   │                            matchIfMissing = true)
+│   │   # 注册 TraceContextFilter；OTel 缺席时不注册，应用自行管理的 traceId 不受影响
+│   ├── LoggingAutoConfiguration.java
+│   │   @ConditionalOnProperty(prefix = "realm.web.logging", name = "enabled")
+│   │   # 默认不启用；启用后注册 RequestLoggingFilter + SensitiveDataMasker
+│   ├── VersioningAutoConfiguration.java
+│   │   @ConditionalOnProperty(prefix = "realm.web.versioning", name = "enabled")
+│   │   # 注册 VersionResolver + ApiVersionArgumentResolver
+│   ├── PaginationAutoConfiguration.java
+│   │   @ConditionalOnClass(name = "cn.realm.cloud.framework.common.pojo.PageParam")
+│   │   @ConditionalOnProperty(prefix = "realm.web.pagination", name = "enabled",
+│   │                            matchIfMissing = true)
+│   │   # 注册 PageParamArgumentResolver
+│   └── WebDefaultsAutoConfiguration.java
+│       @ConditionalOnProperty(prefix = "realm.web.defaults", name = "enabled",
+│                                matchIfMissing = true)
+│       # 注册 WebMvcConfigurer（CORS、安全响应头），全部 @ConditionalOnMissingBean
+│
+├── exception/
+│   ├── GlobalExceptionHandler.java
+│   │   @RestControllerAdvice
+│   │   extends ResponseEntityExceptionHandler
+│   │   # 基类已为 Spring MVC 内建异常返回 RFC 9457 格式；子类只追加业务异常映射
+│   │   依据：Spring Framework 的 ResponseEntityExceptionHandler 自 3.2 起
+│   │         原生支持 RFC 9457 ProblemDetail[reference:2]
+│   ├── ProblemDetailFactory.java
+│   │   # 统一构造 ProblemDetail：设置 type URI、title、instance、扩展属性
+│   │   # 业务异常通过 ProblemDetail.setProperty("errorCode", ...) 携带机器可读错误码
+│   │   依据：RFC 9457 的 type URI 用于标识错误类别，扩展成员允许自定义字段[reference:3]
+│   ├── BusinessExceptionMapper.java
+│   │   # 将 realm-core 的 BusinessException 映射为合适 HTTP 状态码 + ProblemDetail
+│   │   # 映射规则可配置：realm.web.error.business-exception-status-mapping
+│   │   # 不硬编码具体业务错误码，只提供“异常类型 → HTTP 状态码”的机制
+│   └── ValidationExceptionMapper.java
+│       # 将 MethodArgumentNotValidException / ConstraintViolationException
+│       # 转换为 ProblemDetail，在 "violations" 扩展属性中列出字段级错误
+│       依据：RFC 9457 允许扩展成员；Spring 官方示例同样在 ProblemDetail 中
+│             追加 violations 列表[reference:4]
+│
+├── trace/
+│   ├── TraceContextFilter.java
+│   │   @ConditionalOnClass(OpenTelemetry.class)
+│   │   # OncePerRequestFilter
+│   │   # 从入站请求提取 W3C traceparent / tracestate，注入 OTel Context
+│   │   # 在响应头回写 traceparent，并暴露 traceId 供日志 MDC 和 ProblemDetail 使用
+│   │   依据：W3C Trace Context 是厂商中立的跨进程传播协议[reference:5]
+│   ├── TraceContextExtractor.java
+│   │   # 从 HttpServletRequest 解析 traceparent 头，不依赖 OTel 类型
+│   │   # 使解析逻辑可在无 OTel classpath 时独立测试
+│   └── FallbackTraceIdGenerator.java
+│       # OTel 缺席时的降级：生成请求级 traceId，写入 MDC
+│       # 不得因 OTel 为 no-op 而静默丢失追踪能力
+│
+├── logging/
+│   ├── RequestLoggingFilter.java
+│   │   @ConditionalOnProperty(prefix = "realm.web.logging", name = "request-enabled")
+│   │   # 记录 method、URI（不含敏感 query）、状态码、耗时
+│   │   # 默认不打印完整请求/响应 body；body 日志需显式开启并受 max-payload-length 约束
+│   │   依据：OWASP ASVS V8 要求安全日志不记录敏感数据，且错误消息不泄漏内部细节
+│   ├── SensitiveDataMasker.java
+│   │   # 对 JSON body、query parameter、header 中的敏感字段进行脱敏
+│   │   # 默认敏感字段集：password、token、authorization、cookie、api-key、
+│   │   #  身份证号、手机号、银行卡号；可通过 realm.web.logging.mask-fields 扩展
+│   │   依据：OWASP 建议对密码、令牌、API key、PII 进行日志脱敏[reference:6]；
+│   │         实现上可采用递归 JSON 节点替换的方式
+│   ├── LogMaskingProperties.java
+│   │   @ConfigurationProperties(prefix = "realm.web.logging")
+│   │   # mask-fields、max-payload-length、excluded-paths（如 /actuator、/swagger）
+│   │   # 排除路径的依据：actuator 和文档端点不应被业务日志过滤器的 body 截断干扰
+│   └── BodyCaptureWrapper.java
+│       # ContentCachingRequestWrapper / ResponseWrapper 的薄封装
+│       # 仅在日志开启时使用；截断超过 max-payload-length 的 body
+│
+├── versioning/
+│   ├── VersionResolver.java
+│   │   # 接口：String resolve(HttpServletRequest request)
+│   │   # 职责是“提取版本标识”，不规定从哪里提取
+│   ├── HeaderVersionResolver.java
+│   │   # 从 Api-Version 或 X-API-Version 头提取
+│   │   依据：Azure API Management 支持基于 header 的版本控制方案[reference:9]
+│   ├── QueryParamVersionResolver.java
+│   │   # 从 api-version query 参数提取
+│   │   依据：Azure 同样支持基于 query string 的版本控制[reference:10]
+│   ├── PathVersionResolver.java
+│   │   # 从路径段（如 /v1/...）提取
+│   │   依据：Azure 支持基于路径的版本控制[reference:11]
+│   ├── CompositeVersionResolver.java
+│   │   # 按配置的顺序组合多个 Resolver，第一个命中的结果生效
+│   │   # 实际方案由 realm.web.versioning.strategy 配置，默认 header
+│   └── ApiVersionArgumentResolver.java
+│       # HandlerMethodArgumentResolver：让 Controller 直接声明 @ApiVersion String version
+│       # 不在 Controller 内部重复解析请求头/参数
+│
+├── pagination/
+│   ├── PageParamArgumentResolver.java
+│   │   # HandlerMethodArgumentResolver：将 pageNo / pageSize 请求参数解析为 PageParam
+│   │   # 默认值、上限、非法值处理由 realm.web.pagination 配置控制
+│   │   # 复用 realm-core 的 PageParam 契约，不在 Web 层重新定义分页模型
+│   └── PageParamProperties.java
+│       @ConfigurationProperties(prefix = "realm.web.pagination")
+│       # default-page-size、max-page-size、page-no-parameter、page-size-parameter
+│
+├── web/
+│   ├── CorsConfigurer.java
+│   │   # @ConditionalOnMissingBean(WebMvcConfigurer.class) 的 CORS 默认配置
+│   │   # 默认只允许同源；跨域需显式配置 realm.web.cors.allowed-origins
+│   │   依据：OWASP API8:2023 要求严格 CORS，默认拒绝跨域是安全基线
+│   ├── SecurityHeadersConfigurer.java
+│   │   # 通过 WebMvcConfigurer 或 Filter 添加 X-Content-Type-Options、
+│   │   # Cache-Control（对敏感端点）、X-Frame-Options 等
+│   │   依据：OWASP ASVS V8 的安全响应头要求
+│   └── ApiResponseBodyAdvice.java
+│       @ConditionalOnProperty(prefix = "realm.web.error", name = "format",
+│                                havingValue = "api-response")
+│       # ResponseBodyAdvice：将 ProblemDetail 或正常返回值包装为 ApiResponse
+│       # realm-core 的 ApiResponse 本身不感知 Web 层；包装职责完全留在 starter
+│
+└── properties/
+    ├── WebProperties.java
+    │   @ConfigurationProperties(prefix = "realm.web")
+    │   # 顶层启停开关：realm.web.enabled（默认 true）
+    ├── ErrorProperties.java
+    │   @ConfigurationProperties(prefix = "realm.web.error")
+    │   # format: problem-detail | api-response
+    │   # business-exception-status-mapping: Map<String, Integer>
+    └── TraceProperties.java
+        @ConfigurationProperties(prefix = "realm.web.trace")
+        # enabled、propagation-type（默认 W3C）、excluded-paths

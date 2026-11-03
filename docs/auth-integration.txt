@@ -1,0 +1,529 @@
+================================================================================
+vue-element-admin 登录改造与后台接口对接文档
+================================================================================
+
+版本：1.0
+适用前端：vue-element-admin（Vue 2 + Vuex 3 + Vue Router 3）
+适用后端：realm-module-system-server（Spring Boot 3 + Spring Security 6，双令牌 Bearer 认证）
+依据标准：OAuth 2.1（IETF Draft）、RFC 9700（OAuth 2.0 Security Best Current Practice）、
+         OIDC UserInfo Endpoint、OWASP ASVS V3/V4
+
+================================================================================
+一、改造范围总览
+================================================================================
+
+vue-element-admin 原版的认证模型是“单 token + 角色（roles）”，后台改造后变为
+“双令牌（accessToken + refreshToken）+ 权限点（permissions）+ 后端菜单树”。
+这不是“改一个接口地址”能完成的，需要触及 6 个前端文件和 5 个后台接口。
+
+1.1 需要修改的前端文件
+--------------------------------------------------------------------------------
+1) src/utils/auth.js
+   改造性质：重写
+   核心变化：单 token（getToken/setToken）→ 双 token
+             （getAccessToken/setAccessToken/getRefreshToken/setRefreshToken/removeToken）
+
+2) src/utils/request.js
+   改造性质：重写拦截器
+   核心变化：401 时不再直接跳登录，而是触发 token 刷新 + 请求队列重试
+
+3) src/api/user.js
+   改造性质：重写
+   核心变化：登录/刷新/登出/获取用户信息的接口地址与请求体对齐后端
+
+4) src/store/modules/user.js
+   改造性质：重写
+   核心变化：state 增加 refreshToken / permissions；actions 增加 refreshToken；
+             getInfo 消费 /auth/profile
+
+5) src/store/modules/permission.js
+   改造性质：重写
+   核心变化：动态路由不再基于前端 asyncRoutes + roles 过滤，
+             改为消费后端返回的菜单树
+
+6) src/views/login/index.vue
+   改造性质：修改表单
+   核心变化：增加 identifierType 选择（用户名/邮箱/手机号）；
+             如启用验证码，增加验证码字段
+
+不修改但需要确认的文件：
+- src/permission.js（路由守卫，依赖 user.js 的 getInfo 和 permission.js 的 generateRoutes，
+  逻辑本身不需要变）
+- src/directives/permission/（v-permission 指令，确认比较的是 permissions 而非 roles）
+
+1.2 需要对接的后台接口
+--------------------------------------------------------------------------------
+接口：/auth/login
+方法：POST
+请求体：{ identifierType, identifier, password, captchaKey, captchaCode }
+响应：{ accessToken, refreshToken, expiresIn }
+状态：已实现
+
+接口：/auth/refresh
+方法：POST
+请求体：{ refreshToken }
+响应：{ accessToken, refreshToken, expiresIn }
+状态：已实现
+
+接口：/auth/logout
+方法：POST
+请求体：{ refreshToken }
+响应：空
+状态：已实现
+
+接口：/auth/captcha
+方法：GET
+请求体：—
+响应：{ key, image }
+状态：已实现
+
+接口：/auth/profile
+方法：GET
+请求体：—
+响应：{ id, username, nickname, avatar, permissions, menus }
+状态：需要确认是否已落地
+
+/auth/profile 是前端 getInfo 的唯一数据源，承载三样东西：
+- 用户基本信息（顶栏）
+- 权限点列表（v-permission）
+- 菜单树（动态路由）
+如果这个端点尚未实现，前端登录后无法渲染任何受保护页面。
+
+================================================================================
+二、前端文件改造详解
+================================================================================
+
+2.1 src/utils/auth.js：从单 token 到双 token
+--------------------------------------------------------------------------------
+原版只有 getToken / setToken / removeToken，对应 Admin-Token 一个 Cookie。
+双令牌模型需要五个函数，并区分存储策略。
+
+关键决策：
+- accessToken 使用会话 Cookie（不设 expires，浏览器关闭即失效）
+- refreshToken 设置 7 天过期，与后端 realm.security.token.refresh-token-ttl 对齐
+- 前端 Cookie 的 expires 必须与后端配置同步修改，否则会出现
+  “后端还有效、前端已清空”的错位。
+
+代码：
+
+    import Cookies from 'js-cookie'
+
+    const AccessTokenKey = 'Access-Token'
+    const RefreshTokenKey = 'Refresh-Token'
+    const RefreshTokenExpires = 7 // 天，与后端 refresh-token-ttl 对齐
+
+    export function getAccessToken() { return Cookies.get(AccessTokenKey) }
+    export function setAccessToken(token) { return Cookies.set(AccessTokenKey, token) }
+
+    export function getRefreshToken() { return Cookies.get(RefreshTokenKey) }
+    export function setRefreshToken(token) {
+      return Cookies.set(RefreshTokenKey, token, { expires: RefreshTokenExpires })
+    }
+
+    export function removeToken() {
+      Cookies.remove(AccessTokenKey)
+      Cookies.remove(RefreshTokenKey)
+    }
+
+注意：原版的 getToken / setToken 必须删除，不能保留为别名——否则 request.js
+和 user.js 的 import 会继续引用旧函数，双 token 逻辑被架空。
+
+2.2 src/utils/request.js：401 拦截 + 刷新队列 + 重试
+--------------------------------------------------------------------------------
+原版在 401 时直接弹框“重新登录”，不会尝试刷新。改造后需要加入刷新队列：
+多个请求同时 401 时，只触发一次刷新，其余请求挂起等待，刷新成功后统一重试。
+
+核心逻辑：
+
+    let isRefreshing = false
+    let waitingQueue = []
+
+    service.interceptors.request.use(config => {
+      const token = getAccessToken()
+      if (token) {
+        config.headers['Authorization'] = 'Bearer ' + token  // 标准 Bearer，不是 X-Token
+      }
+      return config
+    })
+
+    service.interceptors.response.use(
+      response => response,
+      async error => {
+        const { config, response } = error
+        if (!response || response.status !== 401) return Promise.reject(error)
+
+        // 刷新接口本身 401 不再走刷新，避免无限循环
+        if (config.url.includes('/auth/refresh') || config.url.includes('/auth/login')) {
+          return Promise.reject(error)
+        }
+
+        if (isRefreshing) {
+          return new Promise(resolve => {
+            waitingQueue.push(() => resolve(service(config)))
+          })
+        }
+
+        isRefreshing = true
+        try {
+          await store.dispatch('user/refreshToken')
+          waitingQueue.forEach(cb => cb())
+          waitingQueue = []
+          return service(config)
+        } catch (refreshError) {
+          waitingQueue = []
+          removeToken()
+          store.dispatch('user/resetToken')
+          location.reload()
+          return Promise.reject(refreshError)
+        } finally {
+          isRefreshing = false
+        }
+      }
+    )
+
+三个关键点：
+1) Authorization: Bearer 是 RFC 6750 的标准头，OAuth 2.1 明确 Bearer Token
+   只能通过 Authorization 头传递，禁止放在 URL 查询串中。原版的 X-Token 必须替换。
+2) 刷新接口排除：/auth/refresh 自身返回 401 时不能再触发刷新，否则无限递归。
+3) 刷新失败时 location.reload()：refreshToken 过期或被撤销后，唯一正确的行为
+   是回到登录页。不要尝试“静默降级”。
+
+2.3 src/api/user.js：接口地址与请求体对齐
+--------------------------------------------------------------------------------
+登录请求从 { username, password } 变为
+{ identifierType, identifier, password, captchaKey, captchaCode }。
+identifierType 取 USERNAME / EMAIL / PHONE，对应后端 LoginIdentifierType 枚举。
+
+    export function login(data) {
+      return request({
+        url: '/auth/login',
+        method: 'post',
+        data: {
+          identifierType: data.identifierType,
+          identifier: data.identifier,
+          password: data.password,
+          captchaKey: data.captchaKey,
+          captchaCode: data.captchaCode
+        }
+      })
+    }
+
+    export function refreshTokenApi(refreshToken) {
+      return request({
+        url: '/auth/refresh',
+        method: 'post',
+        data: { refreshToken }
+      })
+    }
+
+    export function logoutApi(refreshToken) {
+      return request({
+        url: '/auth/logout',
+        method: 'post',
+        data: { refreshToken }
+      })
+    }
+
+    export function getProfile() {
+      return request({ url: '/auth/profile', method: 'get' })
+    }
+
+2.4 src/store/modules/user.js：双令牌 + 权限点 + 用户信息
+--------------------------------------------------------------------------------
+login action：登录成功后同时写入 accessToken 和 refreshToken。
+OAuth 2.1 要求 Refresh Token 必须轮换（rotation），每次刷新后旧的立即失效。
+前端必须用响应中的新 refreshToken 覆盖本地存储，不能只更新 accessToken。
+
+    async login({ commit }, userInfo) {
+      const response = await login(userInfo)
+      const { accessToken, refreshToken } = response.data
+      setAccessToken(accessToken)
+      setRefreshToken(refreshToken)
+      commit('SET_ACCESS_TOKEN', accessToken)
+    }
+
+refreshToken action：
+
+    async refreshToken({ commit }) {
+      const current = getRefreshToken()
+      if (!current) throw new Error('没有 refreshToken')
+      const response = await refreshTokenApi(current)
+      const { accessToken, refreshToken } = response.data
+      setAccessToken(accessToken)
+      setRefreshToken(refreshToken)   // 轮换：必须更新 refreshToken
+      commit('SET_ACCESS_TOKEN', accessToken)
+    }
+
+getInfo action：消费 /auth/profile，写入 permissions 和 menus。
+OIDC UserInfo Endpoint 的标准定位是“用 access token 检索已认证用户的声明”，
+本项目的 /auth/profile 在角色上等价于 UserInfo——只读聚合当前用户的资料、
+权限和菜单，不签发令牌。
+
+    async getInfo({ commit }) {
+      const response = await getProfile()
+      const { id, username, nickname, avatar, permissions, menus } = response.data
+
+      if (!permissions || permissions.length === 0) {
+        throw new Error('getInfo: permissions 不能为空')
+      }
+
+      commit('SET_ID', id)
+      commit('SET_NAME', nickname || username)
+      commit('SET_AVATAR', avatar)
+      commit('SET_PERMISSIONS', permissions)
+      commit('SET_MENUS', menus)
+      return response.data
+    }
+
+logout action：先调用 /auth/logout 撤销 refreshToken，再清本地。
+即使登出接口失败，本地清理也不能跳过。
+
+    async logout({ commit }) {
+      try {
+        await logoutApi({ refreshToken: getRefreshToken() })
+      } finally {
+        removeToken()
+        commit('RESET_STATE')
+      }
+    }
+
+2.5 src/store/modules/permission.js：从后端菜单树生成路由
+--------------------------------------------------------------------------------
+原版 permission.js 基于前端预定义的 asyncRoutes + meta.roles 过滤。
+改造后菜单树完全由后端返回，前端只负责把后端的菜单节点转换为
+vue-router 可识别的路由对象。
+
+    import Layout from '@/layout'
+
+    function filterAsyncRouter(routerMap) {
+      return routerMap.filter(item => {
+        if (item.component) {
+          if (item.component === 'Layout') {
+            item.component = Layout
+          } else {
+            // Vue 2 + webpack：必须用 require，不能用 import()
+            item.component = (resolve) => require([`@/views/${item.component}`], resolve)
+          }
+        }
+        if (item.children && item.children.length) {
+          item.children = filterAsyncRouter(item.children)
+        }
+        return true
+      })
+    }
+
+    const actions = {
+      generateRoutes({ commit }) {
+        return new Promise(resolve => {
+          const menus = store.getters.menus || []
+          const accessedRoutes = filterAsyncRouter(menus)
+          commit('SET_ROUTES', accessedRoutes)
+          resolve(accessedRoutes)
+        })
+      }
+    }
+
+组件路径映射是唯一需要前端硬编码的约定：后端返回的 component 字符串
+（如 admin/user）必须能映射到 @/views/admin/user.vue。
+这个约定需要前后端在字段设计时对齐，不能各自为政。
+
+2.6 src/views/login/index.vue：增加登录标识类型
+--------------------------------------------------------------------------------
+表单从“用户名 + 密码”变为“标识类型 + 标识 + 密码”。
+如果后端启用了验证码（realm.security.captcha.enabled），还需要增加验证码图片和输入框。
+
+    <el-form-item prop="identifierType">
+      <el-select v-model="loginForm.identifierType">
+        <el-option label="用户名" value="USERNAME" />
+        <el-option label="邮箱" value="EMAIL" />
+        <el-option label="手机号" value="PHONE" />
+      </el-select>
+    </el-form-item>
+    <el-form-item prop="identifier">
+      <el-input v-model="loginForm.identifier" placeholder="用户名 / 邮箱 / 手机号" />
+    </el-form-item>
+    <el-form-item prop="password">
+      <el-input v-model="loginForm.password" type="password" show-password />
+    </el-form-item>
+
+================================================================================
+三、与后台接口的完整协作流程
+================================================================================
+
+3.1 登录流程
+--------------------------------------------------------------------------------
+前端 POST /auth/login
+  { identifierType: "EMAIL", identifier: "admin@example.com", password: "***" }
+
+后端 AuthService
+  1) PasswordAuthenticatorProvider.authenticate(type, identifier, password)
+     → UserFacade.findCredential(type, identifier) → 校验 BCrypt
+  2) UserFacade.findPermissionsByUserId(userId)
+     → RoleFacade.findMenuIdsByRoleIds → MenuFacade.findPermissionCodesByMenuIds
+  3) TokenService.createAccessToken(user) + createRefreshToken(user)
+
+响应 { accessToken, refreshToken, expiresIn }
+
+前端：setAccessToken / setRefreshToken 写入 Cookie
+
+3.2 页面刷新 / 首次进入受保护路由
+--------------------------------------------------------------------------------
+前端路由守卫（src/permission.js）
+  → 有 accessToken？
+      → 有 → 调 store.dispatch('user/getInfo')
+             → GET /auth/profile
+             → 写入 permissions + menus
+             → store.dispatch('permission/generateRoutes')
+             → router.addRoutes(accessedRoutes)
+      → 无 → 跳 /login
+
+3.3 请求遇到 401（accessToken 过期）
+--------------------------------------------------------------------------------
+任一 API 请求 → 401
+  → request.js 拦截器
+     → 是 /auth/refresh 或 /auth/login？ → 直接失败
+     → 已在刷新中？ → 加入等待队列
+     → 否 → store.dispatch('user/refreshToken')
+              → POST /auth/refresh { refreshToken }
+              → 响应新 accessToken + 新 refreshToken
+              → setAccessToken / setRefreshToken（轮换）
+              → 重试等待队列 + 重试当前请求
+     → 刷新失败 → removeToken + resetToken + 跳登录
+
+3.4 登出
+--------------------------------------------------------------------------------
+前端 store.dispatch('user/logout')
+  → POST /auth/logout { refreshToken }
+  → 后端 TokenService.revokeRefreshToken(refreshToken)
+  → 前端 removeToken() + commit('RESET_STATE')
+
+================================================================================
+四、国际标准与企业实践对照
+================================================================================
+
+本方案的做法：Authorization: Bearer <accessToken>
+对应标准/实践：RFC 6750 / OAuth 2.1
+说明：禁止将 token 放在 URL 查询串中，Bearer 只能通过 Authorization 头传递
+
+本方案的做法：Access Token 短生命周期（15 分钟）
+对应标准/实践：OAuth 2.1 / RFC 9700
+说明：2026 推荐值：Access Token 15 分钟–1 小时
+
+本方案的做法：Refresh Token 7 天 + 每次刷新轮换
+对应标准/实践：OAuth 2.1 强制要求
+说明：Refresh token rotation mandatory；轮换后旧 token 立即失效，重放会被检测
+
+本方案的做法：前端存 token 而非 Cookie 自动携带
+对应标准/实践：OAuth 2.1 SPA 实践
+说明：标准推荐 SPA 使用 Authorization 头；更安全的模式是 BFF（token 不暴露给浏览器），
+     但 vue-element-admin 架构不适用 BFF，Authorization 头是次优选择
+
+本方案的做法：/auth/profile 独立于 /auth/login
+对应标准/实践：OIDC UserInfo Endpoint
+说明：UserInfo 用 access token 检索用户声明，与 token 签发端点分离。
+     如果把权限和菜单塞进登录响应，/auth/refresh 也要重复返回，
+     在 15 分钟刷新周期下会造成大量重复查询
+
+本方案的做法：权限点（system:user:create）而非角色控制
+对应标准/实践：OWASP ASVS V4
+说明：访问控制应基于能力/权限点，而不是角色标签；角色只是权限点的聚合载体
+
+本方案的做法：v-permission 指令隐藏按钮
+对应标准/实践：OWASP ASVS V4
+说明：前端隐藏是体验优化，不是安全控制——后端 @PreAuthorize 才是最终防线。
+     文档中必须明确这一点，避免前端把“按钮隐藏”当成“权限已生效”
+
+================================================================================
+五、安全要点与常见错误
+================================================================================
+
+第一，前端权限控制不是安全边界。
+v-permission 隐藏按钮、动态路由过滤页面，都只影响用户体验。
+任何用户都可以通过 DevTools 修改前端状态或直接构造 API 请求。
+真正的权限校验在 @PreAuthorize("@ss.hasPermission(...)") 和后端 PermissionChecker 中。
+前端文档中应明确写清这一点，避免团队产生“前端控制了权限”的错觉。
+
+第二，refreshToken 轮换必须在前端落实。
+后端每次 /auth/refresh 返回新的 refreshToken，前端必须用新值覆盖 Cookie。
+如果只更新 accessToken 而保留旧 refreshToken，下一次刷新时后端会判定
+“重用已失效的 refreshToken”并拒绝，用户被迫重新登录。
+
+第三，刷新接口必须排除在 401 刷新逻辑之外。
+/auth/refresh 自身返回 401 时如果再次触发刷新，会形成无限递归。
+request.js 中必须显式排除 /auth/refresh 和 /auth/login。
+
+第四，getInfo 返回空 permissions 时应失败，而不是放行。
+如果 /auth/profile 返回的 permissions 是空数组，前端 getInfo 应抛错并回到登录页，
+而不是“无权限也进入主页”。空权限集合意味着“用户没有任何可访问的资源”，
+继续放行只会导致后续所有 API 返回 403，体验更差。
+
+================================================================================
+六、实施步骤建议
+================================================================================
+
+第一阶段：认证链路（最小可运行）
+改 auth.js、request.js、api/user.js、store/user.js 的 login / refreshToken / logout，
+跑通“登录 → 拿到双 token → 访问受保护接口 → 401 自动刷新”这条链路。
+此时 getInfo 和动态路由可以暂时用硬编码菜单兜底。
+
+第二阶段：用户信息与权限点
+确认 /auth/profile 已落地，改 getInfo 消费它，把 permissions 写入 Vuex，
+确认 v-permission 指令比较的是 permissions 而非 roles。
+
+第三阶段：动态菜单
+改 permission.js，消费 /auth/profile 返回的 menus，替换前端硬编码的 asyncRoutes。
+
+第四阶段：登录表单与验证码
+改 login/index.vue，增加 identifierType 选择和验证码（如启用）。
+
+第一阶段是整个改造的根基。认证链路不通，后面的权限和菜单都无法验证。
+建议在阶段一完成后先用手动设置 Cookie 的方式测试 401 刷新逻辑，
+确认刷新队列和轮换行为正确，再进入阶段二。
+
+================================================================================
+七、验收清单
+================================================================================
+
+检查项：登录成功
+通过标准：Cookie 中同时存在 Access-Token 和 Refresh-Token；
+         Access-Token 为会话 Cookie，Refresh-Token 有 7 天过期时间
+
+检查项：登录失败
+通过标准：错误信息统一为“用户名或密码错误”，不暴露“用户不存在”
+
+检查项：受保护接口
+通过标准：请求头为 Authorization: Bearer <token>，不是 X-Token
+
+检查项：accessToken 过期
+通过标准：并发 3 个请求同时 401 时，只触发 1 次 /auth/refresh，
+         3 个请求全部自动重试成功
+
+检查项：refreshToken 轮换
+通过标准：刷新后 Cookie 中的 Refresh-Token 值已变化，旧值不再可用
+
+检查项：refreshToken 失效
+通过标准：刷新接口返回 401 时，前端清理所有 token 并跳转登录页，无无限循环
+
+检查项：/auth/profile
+通过标准：返回的 permissions 非空；menus 每个节点含
+         path / component / meta.title
+
+检查项：动态菜单
+通过标准：侧边栏菜单与 /auth/profile 返回的菜单树一致；无权限的菜单不出现
+
+检查项：按钮权限
+通过标准：v-permission="['system:user:delete']" 在无权限时不渲染按钮；
+         同时后端该接口返回 403
+
+================================================================================
+一句话总结
+================================================================================
+vue-element-admin 改造的核心不是“改几个接口地址”，而是把认证模型从
+“单 token + 角色”迁移到“双令牌轮换 + 权限点 + 后端菜单”。
+request.js 的 401 刷新队列和 auth.js 的双 token 存储是整个改造的技术底座，
+/auth/profile 是权限和菜单的数据源头。三者到位，前端才能在 OAuth 2.1 / OIDC
+的框架下与后台正确协作。
+
+================================================================================
+文档结束
+================================================================================

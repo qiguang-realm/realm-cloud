@@ -33,14 +33,31 @@ import java.util.Set;
  *     <li>{@link MPJBaseMapper}：MyBatis-Plus-Join 连表查询能力</li>
  * </ul>
  *
+ * <p><b>职责边界：本接口只做转换和委托，不做参数校验。</b>
+ * {@code pageSize} 的取值范围由调用方（Service 层）保证：
+ * HTTP 入口由 {@code PageParam} 上的 {@code @Min} / {@code @Max}
+ * 配合 {@code @Valid} 拦截；内部调用由 Service 层显式校验。
+ * 本接口信任入参已合法。如果非法值传到本接口，由 MyBatis-Plus
+ * 或数据库抛出底层异常，交由全局异常处理器统一转换。
+ *
+ * <p><b>为什么不支持“不分页”模式：</b>依据 Google AIP-158 与
+ * Microsoft REST API Guidelines——集合端点必须分页，不存在
+ * “返回全量”这一选项。全量数据的需求应由独立的导出端点承担，
+ * 而不是让列表查询通过 {@code pageSize = -1} 退化为全表扫描。
+ * 因此所有分页方法都走 {@link MyBatisPageUtils#toPage(PageParam)}
+ * 构造 {@code Page}，不再有“判断是否分页”的分支。
+ *
  * <p><b>安全说明（CWE-89 / OWASP ASVS 5.3.4）：</b>
  * 所有涉及字段名的方法，均提供 {@code String} 与 {@code SFunction} 两个版本。
  * {@code String} 版本因存在 SQL 注入风险，已标记 {@link Deprecated}；
- * 新代码必须使用 Lambda 版本。排序字段必须通过 {@code allowedFields} 白名单传入。
+ * 新代码必须使用 Lambda 版本。排序字段必须通过 {@code allowedFields}
+ * 白名单传入，白名单解析由 {@link SortablePageParam#parseSortFields(Set)}
+ * 完成，本接口不负责字段合法性校验。
  *
  * <p><b>跨数据库兼容性：</b>
- * {@link #selectOneForUpdate} 与 {@link #selectFirstForUpdate} 依赖 {@code FOR UPDATE} 语法，
- * <b>仅支持 MySQL / PostgreSQL / Oracle / 达梦 / 金仓</b>；SQL Server 需在子接口中 override。
+ * {@link #selectOneForUpdate} 与 {@link #selectFirstForUpdate} 依赖
+ * {@code FOR UPDATE} 语法，<b>仅支持 MySQL / PostgreSQL / Oracle / 达梦 / 金仓</b>；
+ * SQL Server 需在子接口中 override。
  *
  * @param <T> 实体类型
  * @author QI Guang
@@ -56,6 +73,12 @@ public interface BaseMapperX<T> extends MPJBaseMapper<T> {
 
     /**
      * 分页查询（无排序）。
+     *
+     * <p>纯委托：把空排序列表传给核心实现，避免每次调用都创建空集合。
+     *
+     * @param pageParam    分页参数
+     * @param queryWrapper 查询条件
+     * @return 分页结果
      */
     default PageResult<T> selectPage(PageParam pageParam, @Param("ew") Wrapper<T> queryWrapper) {
         return selectPage(pageParam, MyBatisPageUtils.EMPTY_SORTS, queryWrapper);
@@ -64,9 +87,14 @@ public interface BaseMapperX<T> extends MPJBaseMapper<T> {
     /**
      * 分页查询（带排序，白名单强校验）。
      *
+     * <p>排序字段由 {@link SortablePageParam#parseSortFields(Set)} 根据
+     * 白名单解析，白名单外的字段被静默忽略——这是“排序配置可能不完整”
+     * 的正常降级，不是错误。本接口不重复校验字段合法性。
+     *
      * @param pageParam     分页 + 排序参数
      * @param allowedFields 允许排序的字段白名单（数据库列名）
      * @param queryWrapper  查询条件
+     * @return 分页结果
      */
     default PageResult<T> selectPage(SortablePageParam pageParam, Set<String> allowedFields,
                                      @Param("ew") Wrapper<T> queryWrapper) {
@@ -75,17 +103,26 @@ public interface BaseMapperX<T> extends MPJBaseMapper<T> {
 
     /**
      * 分页查询（核心实现）。
+     *
+     * <p>四步纯转换：
+     * <ol>
+     *   <li>{@link MyBatisPageUtils#toPage(PageParam)} 构造 {@code Page}</li>
+     *   <li>{@link MyBatisPageUtils#addOrder(Page, List)} 追加排序</li>
+     *   <li>{@code selectPage(page, wrapper)} 执行查询</li>
+     *   <li>{@link MyBatisPageUtils#toPageResult(IPage)} 转换为框架无关的分页结果</li>
+     * </ol>
+     *
+     * <p><b>没有 {@code !pageParam.isPaged()} 分支：</b>“不分页”模式已废弃，
+     * 列表 API 永远分页。全量查询走 {@code selectList(wrapper)} + 独立导出端点，
+     * 不经过本方法。
+     *
+     * @param pageParam    分页参数
+     * @param sortFields   已校验的排序字段列表
+     * @param queryWrapper 查询条件
+     * @return 分页结果
      */
     default PageResult<T> selectPage(PageParam pageParam, List<SortField> sortFields,
                                      @Param("ew") Wrapper<T> queryWrapper) {
-        // 不分页模式：查询全部并附加排序
-        if (!pageParam.isPaged()) {
-            MyBatisPageUtils.addOrder(queryWrapper, sortFields);
-            List<T> list = selectList(queryWrapper);
-            return PageResult.of(list, list.size(), list.size(), 1);
-        }
-
-        // 分页模式
         Page<T> page = MyBatisPageUtils.toPage(pageParam);
         MyBatisPageUtils.addOrder(page, sortFields);
         selectPage(page, queryWrapper);
@@ -96,13 +133,14 @@ public interface BaseMapperX<T> extends MPJBaseMapper<T> {
 
     /**
      * 连表分页查询（无排序）。
+     *
+     * @param pageParam     分页参数
+     * @param clazz         结果类型
+     * @param lambdaWrapper 连表查询条件
+     * @return 分页结果
      */
     default <D> PageResult<D> selectJoinPage(PageParam pageParam, Class<D> clazz,
                                              MPJLambdaWrapper<T> lambdaWrapper) {
-        if (!pageParam.isPaged()) {
-            List<D> list = selectJoinList(clazz, lambdaWrapper);
-            return PageResult.of(list, list.size(), list.size(), 1);
-        }
         Page<D> page = MyBatisPageUtils.toPage(pageParam);
         IPage<D> result = selectJoinPage(page, clazz, lambdaWrapper);
         return MyBatisPageUtils.toPageResult(result);
@@ -110,14 +148,20 @@ public interface BaseMapperX<T> extends MPJBaseMapper<T> {
 
     /**
      * 连表分页查询（带排序，白名单强校验）。
+     *
+     * <p>排序字段由 {@link SortablePageParam#parseSortFields(Set)} 解析。
+     * 注意 {@link MyBatisPageUtils#addOrder(Page, List)} 接收的是
+     * <b>数据库列名</b>，与 JPA 场景的“实体属性名”语义不同。
+     *
+     * @param pageParam     分页 + 排序参数
+     * @param allowedFields 允许排序的字段白名单（数据库列名）
+     * @param clazz         结果类型
+     * @param lambdaWrapper 连表查询条件
+     * @return 分页结果
      */
     default <D> PageResult<D> selectJoinPage(SortablePageParam pageParam, Set<String> allowedFields,
                                              Class<D> clazz, MPJLambdaWrapper<T> lambdaWrapper) {
         List<SortField> sortFields = pageParam.parseSortFields(allowedFields);
-        if (!pageParam.isPaged()) {
-            List<D> list = selectJoinList(clazz, lambdaWrapper);
-            return PageResult.of(list, list.size(), list.size(), 1);
-        }
         Page<D> page = MyBatisPageUtils.toPage(pageParam);
         MyBatisPageUtils.addOrder(page, sortFields);
         IPage<D> result = selectJoinPage(page, clazz, lambdaWrapper);
@@ -127,15 +171,16 @@ public interface BaseMapperX<T> extends MPJBaseMapper<T> {
     /**
      * 通用连表分页查询（无排序）。
      *
-     * <p><b>修复：</b>原实现缺少 {@code !pageParam.isPaged()} 分支，
-     * 当 {@code pageSize = -1} 时会让 MP 生成非法 SQL。
+     * <p>与 {@link #selectJoinPage(PageParam, Class, MPJLambdaWrapper)}
+     * 的区别：接受更通用的 {@link MPJBaseJoin}，适配自定义的连表 wrapper。
+     *
+     * @param pageParam        分页参数
+     * @param resultTypeClass  结果类型
+     * @param joinQueryWrapper 连表查询条件
+     * @return 分页结果
      */
     default <DTO> PageResult<DTO> selectJoinPage(PageParam pageParam, Class<DTO> resultTypeClass,
                                                  MPJBaseJoin<T> joinQueryWrapper) {
-        if (!pageParam.isPaged()) {
-            List<DTO> list = selectJoinList(resultTypeClass, joinQueryWrapper);
-            return PageResult.of(list, list.size(), list.size(), 1);
-        }
         Page<DTO> page = MyBatisPageUtils.toPage(pageParam);
         IPage<DTO> result = selectJoinPage(page, resultTypeClass, joinQueryWrapper);
         return MyBatisPageUtils.toPageResult(result);
@@ -144,7 +189,8 @@ public interface BaseMapperX<T> extends MPJBaseMapper<T> {
     // ==================== 单条记录查询 ====================
 
     /**
-     * @deprecated 使用 String 作为字段名存在 SQL 注入风险（CWE-89）；请使用 {@link #selectOne(SFunction, Object)}
+     * @deprecated 使用 String 作为字段名存在 SQL 注入风险（CWE-89）；
+     * 请使用 {@link #selectOne(SFunction, Object)}
      */
     @Deprecated(since = "2026.08", forRemoval = true)
     default T selectOne(String field, Object value) {
@@ -234,6 +280,11 @@ public interface BaseMapperX<T> extends MPJBaseMapper<T> {
      * <p><b>语义说明：</b>“首条”由底层 SQL 的执行计划决定，
      * 若需确定性顺序，请在 wrapper 中显式 {@code orderByAsc(...)}。
      *
+     * <p><b>实现说明：</b>用 {@code Page(1, 1)} + {@code setSearchCount(false)}
+     * 实现 {@code LIMIT 1} 且不查总数——这是内部实现细节，
+     * 不涉及参数校验。这里的 {@code Page} 构造是固定的 {@code (1, 1)}，
+     * 与分页查询的“用户传入 pageNo / pageSize”是两回事。
+     *
      * @param wrapper 查询条件
      * @return 首条记录；不存在返回 {@code null}
      */
@@ -271,6 +322,9 @@ public interface BaseMapperX<T> extends MPJBaseMapper<T> {
      * <p><b>语义警告：</b>“末条”指查询结果列表的最后一项，
      * <b>不是数据库中“最新”的一条</b>。若需“最新一条”，
      * 请在 wrapper 中显式 {@code orderByDesc(创建时间)} 后再调用本方法。
+     *
+     * <p><b>性能警告：</b>本方法会把满足条件的全部记录加载到内存再取末条。
+     * 结果集较大时应改用“显式排序 + {@link #selectFirst}”的方式。
      *
      * @param queryWrapper 查询条件（建议包含排序）
      * @return 末条记录；不存在返回 {@code null}
@@ -326,6 +380,15 @@ public interface BaseMapperX<T> extends MPJBaseMapper<T> {
         return selectList(new QueryWrapper<T>().in(field, values));
     }
 
+    /**
+     * 按单个字段的集合值做 {@code IN} 查询。
+     *
+     * <p><b>为什么 {@code values} 为空时返回空列表：</b>
+     * SQL 的 {@code IN ()} 是非法语法，{@code IN (NULL)} 永不匹配。
+     * 与其让数据库报错或返回空结果，不如在应用层短路——
+     * 这是“无查询条件时无操作返回”的转换语义，不是参数校验。
+     * 调用方拿到空列表后仍可正常处理，不需要额外判空。
+     */
     default List<T> selectList(SFunction<T, ?> field, Collection<?> values) {
         if (CollUtil.isEmpty(values)) {
             return Collections.emptyList();
@@ -346,6 +409,9 @@ public interface BaseMapperX<T> extends MPJBaseMapper<T> {
      *
      * <p><b>注意：</b>若使用 SQL Server，批量插入后无法自动回填自增主键。
      * 如业务依赖主键回填，请在子接口中 override 本方法。
+     *
+     * <p>{@code entities} 为空时返回 {@code false}——这是“空集合无操作”的
+     * 返回值约定，不是校验。调用方拿到 {@code false} 后正常继续即可。
      *
      * @param entities 实体集合
      * @return {@code true} 表示有实体被处理；{@code false} 表示入参为空
@@ -409,7 +475,8 @@ public interface BaseMapperX<T> extends MPJBaseMapper<T> {
     // ==================== 删除操作 ====================
 
     /**
-     * @deprecated 使用 String 作为字段名存在 SQL 注入风险；请使用 {@link #delete(SFunction, Object)}
+     * @deprecated 使用 String 作为字段名存在 SQL 注入风险；
+     * 请使用 {@link #delete(SFunction, Object)}
      */
     @Deprecated(since = "2026.08", forRemoval = true)
     default int delete(String field, Object value) {

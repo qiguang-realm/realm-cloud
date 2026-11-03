@@ -71,7 +71,6 @@ import java.util.Set;
  * @see GlobalExceptionHandler
  * @see RawResponse
  * @see TraceContextAccessor
- * @since 1.0.0
  */
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE + 200)

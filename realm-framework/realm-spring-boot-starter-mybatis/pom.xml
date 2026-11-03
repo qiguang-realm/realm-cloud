@@ -33,7 +33,7 @@
         <!-- 基础工具类：提供 Realm 通用工具和基础 POJO / Foundation utilities: Realm common utilities and base POJOs -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-common</artifactId>
+            <artifactId>realm-core</artifactId>
         </dependency>
 
         <!-- Web 与安全（provided：仅用于 OncePerRequestFilter，安全实现由使用方在运行时提供） / Web & security (provided: used only by OncePerRequestFilter; security impl provided by consumers at runtime) -->
@@ -127,6 +127,13 @@
         <dependency>
             <groupId>org.dromara</groupId>
             <artifactId>easy-trans-mybatis-plus-extend</artifactId>
+        </dependency>
+
+        <!-- 测试组件（test 作用域） / Test starter (test scope) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
 
     </dependencies>

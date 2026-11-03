@@ -1,0 +1,119 @@
+realm-spring-boot-starter-security/
+└── src/main/java/cn/realm/cloud/framework/security/
+    │
+    ├── package-info.java
+    │   // 依据：OWASP ASVS V1 架构要求——安全控制必须集中化实现，
+    │   // 跨切面的认证/授权能力不应散落在各业务模块中。
+    │   // 本 starter 即“安全能力下沉”的载体，所有业务模块通过引入依赖
+    │   // 获得统一的安全基线，而非各自实现。
+    │
+    ├── config/                                    # 自动配置
+    │   ├── RealmSecurityAutoConfiguration.java
+    │   │   // 依据：Spring Boot 自动配置规范 + ASVS L3 “安全控制集中化”。
+    │   │   // 通过 AutoConfiguration.imports 注册，业务模块零代码获得安全能力。
+    │   │
+    │   ├── SecurityFilterChainConfiguration.java
+    │   │   // 依据：OAuth 2.1 / RFC 9700——资源服务器应使用 Bearer Token 保护端点；
+    │   │   // 默认拒绝（deny by default）是 OWASP 的基本原则。
+    │   │   // 此处配置的 FilterChain 对 /admin/** 等路径强制认证，对 /auth/** 放行。
+    │   │
+    │   ├── WebSecurityBeanConfiguration.java
+    │   │   // 依据：Spring Security 官方推荐——核心 Bean（PasswordEncoder / TokenService）
+    │   │   // 使用 @ConditionalOnMissingBean，允许业务方覆盖，保持 starter 的开放性。
+    │   │   // NIST SP 800-63B-4 要求密码哈希使用自适应单向函数（BCrypt cost≥10）。
+    │   │
+    │   ├── OperateLogConfiguration.java
+    │   └── properties/
+    │       ├── RealmSecurityProperties.java
+    │       └── TokenProperties.java
+    │           // 依据：RFC 9700——Access Token 必须短生命周期（分钟级）。
+    │           // 此处通过 externalized config 控制 TTL，禁止硬编码 24 小时以上的过期时间。
+    │
+    ├── core/                                      # 模型、SPI、常量
+    │   ├── LoginUser.java
+    │   │   // 设计依据：OWASP ASVS V2——认证后不应在会话/上下文中保留密码哈希。
+    │   │   // LoginUser 刻意不包含 passwordHash，仅保留授权所需的 permissions 集合。
+    │   │
+    │   ├── LoginUserProvider.java
+    │   │   // 依据：依赖反转原则（DIP）——starter 定义 SPI，业务模块提供实现。
+    │   │   // ASVS V2 要求“认证控制集中化”，但用户数据的来源应由业务方负责。
+    │   │   // 两个方法分工明确：loadCredentialByUsername 仅在登录时调用一次，返回哈希；
+    │   │   // loadUserById 在每次请求过滤器中使用，不返回敏感字段。
+    │   │
+    │   ├── SecurityUtils.java
+    │   │   // 依据：OWASP ASVS V3——会话标识符不应通过 URL 传递；
+    │   │   // 所有身份信息从 SecurityContext 读取，不信任客户端传入的 userId 参数。
+    │   │
+    │   ├── PermissionChecker.java
+    │   │   // @ss Bean，供 @PreAuthorize 使用。
+    │   │   // 依据：ASVS V4——访问控制必须在每个请求上强制执行，
+    │   │   // 不能依赖前端隐藏按钮或客户端缓存。
+    │   │   // 实现中同时校验 status=0（账号未停用），停用账号即使持有有效 token 也应被拒绝。
+    │   │
+    │   ├── TokenService.java
+    │   │   // 依据：RFC 9700（OAuth 2.0 安全最佳实践）——Refresh Token 必须轮换（rotation）
+    │   │   // 并检测重用（reuse detection）。接口设计包含 rotateRefreshToken 和 revokeRefreshToken，
+    │   │   // 从契约层面强制实现方处理令牌生命周期，而非只签发不回收。
+    │   │
+    │   ├── CaptchaService.java
+    │   │   // 依据：NIST SP 800-63B-4——认证端点应具备暴力破解防护；
+    │   │   // OWASP 认证备忘单推荐验证码作为速率限制的补充手段。
+    │   │
+    │   ├── constant/
+    │   │   └── SecurityConstants.java
+    │   │       // 依据：RFC 6750——Bearer Token 通过 Authorization 头传递，格式为 "Bearer <token>"。
+    │   │
+    │   └── impl/
+    │       ├── JwtTokenServiceImpl.java
+    │       │   // 默认实现：JWT Access Token（无状态）+ Redis 存储 Refresh Token 状态。
+    │       │   // 依据：RFC 7519（JWT） + RFC 9700（轮换与重用检测）。
+    │       │   // 通过 @ConditionalOnMissingBean 允许业务方替换为 Redis 全状态方案。
+    │       │
+    │       └── SimpleCaptchaServiceImpl.java
+    │
+    ├── auth/                                      # 认证端点
+    │   ├── AuthController.java
+    │   │   // 路径通过 ${realm.security.auth.path:/auth} 可配置。
+    │   │   // 依据：Google / Microsoft 管理 API 的公开实践——
+    │   │   // 管理端不暴露私有会话 Cookie，前端通过标准 Authorization 头携带 Bearer Token。
+    │   │   // 此处 /auth/login 仅作为“签发令牌”的端点，不建立服务端 Session，
+    │   │   // 后续所有 /admin/** 请求都依赖 TokenAuthenticationFilter 解析 Bearer Token。
+    │   │
+    │   ├── AuthService.java
+    │   │   // 登录流程的错误信息统一为“用户名或密码错误”。
+    │   │   // 依据：OWASP 认证备忘单——不得区分“用户不存在”与“密码错误”，
+    │   │   // 防止攻击者通过错误差异枚举有效用户名（用户枚举漏洞）。
+    │   │   // 第 3 步的 PasswordEncoder.matches 使用 BCrypt，符合 NIST SP 800-63B-4。
+    │   │
+    │   └── dto/
+    │       ├── LoginRequest.java
+    │       ├── LoginResponse.java
+    │       ├── RefreshTokenRequest.java
+    │       └── CaptchaResponse.java
+    │
+    ├── web/                                       # Web 层组件
+    │   ├── filter/
+    │   │   └── TokenAuthenticationFilter.java
+    │   │       // 依据：RFC 6750——从 Authorization: Bearer 头解析令牌。
+    │   │       // 过滤器不抛异常：无效 token 仅不设置 SecurityContext，
+    │   │       // 由 EntryPoint 统一返回 401。这避免了“无效 token 导致 500”的常见反模式。
+    │   │       // ASVS V3 要求会话在认证时轮换，此处每次请求都从 token 重新加载 LoginUser，
+    │   │       // 不依赖任何客户端可篡改的缓存标志。
+    │   │
+    │   └── handler/
+    │       ├── RestAuthenticationEntryPoint.java
+    │       │   // 401 响应，返回统一 ApiResult 格式，不暴露 Spring Security 默认 HTML 错误页。
+    │       │   // 依据：ASVS V7——错误处理不应泄露技术栈细节（如默认的 whitelabel error page）。
+    │       │
+    │       └── RestAccessDeniedHandler.java
+    │           // 403 响应，用于已认证但无权限的场景。
+    │           // 依据：ASVS V4——访问控制失败时，不应暴露资源是否存在等敏感信息。
+    │
+    └── operatelog/                                # 操作日志（bizlog 封装）
+        ├── annotation/
+        │   └── OperateLog.java
+        └── aspect/
+            └── OperateLogAspect.java
+                // 依据：ASVS V7——所有认证决策必须记录日志。
+                // 此切面将 LoginUser 注入 bizlog 上下文，
+                // 确保操作日志包含“谁”在“什么时间”执行了操作，满足审计追溯要求。

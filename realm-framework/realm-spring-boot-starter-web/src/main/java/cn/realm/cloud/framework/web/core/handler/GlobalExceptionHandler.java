@@ -62,7 +62,6 @@ import java.util.stream.Collectors;
  * @author QI Guang
  * @see GlobalResponseBodyAdvice
  * @see TraceContextAccessor
- * @since 1.0.0
  */
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE + 100)

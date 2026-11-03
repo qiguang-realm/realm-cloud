@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-utils</artifactId>
+    <packaging>jar</packaging>
+
+    <!-- 项目信息 / Project information -->
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：通用工具类 / Responsibility boundary: general utilities
+        仅包含：日期处理、字符串工具、ID 生成、JSON 辅助、对象映射辅助、线程上下文传递 / Only contains: date handling, string utilities, ID generation, JSON helpers, object mapping helpers, thread context propagation
+        不含技术契约，不含业务语义，不含 Web 运行时逻辑 / No technical contracts, no business semantics, no web runtime logic
+        技术契约请使用 realm-core；Web 横切能力请使用 realm-web-spring-boot-starter / Use realm-core for technical contracts; use realm-web-spring-boot-starter for web cross-cutting concerns
+    -->
+    <description>
+        通用工具类：日期处理、字符串工具、ID 生成、JSON 辅助、对象映射辅助、线程上下文传递等。
+        不包含技术契约、业务语义或 Web 运行时逻辑。
+        General utilities: date handling, string utilities, ID generation, JSON helpers,
+        object mapping helpers, thread context propagation, etc.
+        No technical contracts, business semantics, or web runtime logic.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            Spring 核心工具：StringUtils、Assert、ObjectUtils 等 / Spring core utilities: StringUtils, Assert, ObjectUtils, etc.
+            provided：由宿主 Spring Boot 应用提供，工具类仅在编译期需要 / provided: supplied by host Spring Boot application; only needed at compile time
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            全能工具库：Hutool（日期、字符串、ID、加密、JSON 辅助等） / All-in-one utility library: Hutool (date, string, ID, crypto, JSON helpers, etc.)
+            compile：工具模块的核心运行时依赖；主动引入 realm-utils 的模块才会获得此依赖，不引入的模块不受影响 / compile: core runtime dependency of the utility module; only modules that explicitly depend on realm-utils get it, others are unaffected
+        -->
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+        </dependency>
+
+        <!--
+            线程上下文传递：TransmittableThreadLocal / Thread context propagation: TransmittableThreadLocal
+            compile：线程上下文工具类的运行时依赖 / compile: runtime dependency of the thread-context utility classes
+        -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>transmittable-thread-local</artifactId>
+        </dependency>
+
+        <!--
+            JSON 辅助：Jackson（工具类中的 JSON 读写辅助） / JSON helpers: Jackson (JSON read/write helpers in utility classes)
+            compile：工具模块运行时需要 / compile: required at runtime by the utility module
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <!-- Java 8 时间类型支持 / Java 8 date-time support -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+        <!--
+            对象映射：MapStruct（工具类中的 DO/DTO 转换辅助） / Object mapping: MapStruct (DO/DTO mapping helpers in utility classes)
+            注解保持 compile：生成的映射器实现类需要这些注解在运行时可见 / Annotations stay compile: generated mapper implementations need them visible at runtime
+            processor 不在此声明，放入下方 maven-compiler-plugin 的 annotationProcessorPaths / The processor is not declared here; it goes into maven-compiler-plugin's annotationProcessorPaths below
+        -->
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+        </dependency>
+
+        <!--
+            日志门面：工具类中的日志 / Logging facade: logging in utility classes
+            provided：由运行时日志实现（Logback/Log4j2）提供 / provided: supplied by runtime logging implementation (Logback/Log4j2)
+        -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递 / optional: pure compile-time annotation processor; not needed at runtime, not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需 / Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 测试相关 / Testing -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+                注解处理器配置 / Annotation processor configuration
+                Lombok 必须在 MapStruct 之前执行，确保生成的 getter/setter 对 MapStruct 可见 / Lombok must run before MapStruct so generated getters/setters are visible to MapStruct
+                lombok-mapstruct-binding 显式声明两者的协作绑定，避免版本不匹配导致的映射失效 / lombok-mapstruct-binding explicitly declares the collaboration binding to avoid mapping failures from version mismatch
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </path>
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                        </path>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok-mapstruct-binding</artifactId>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

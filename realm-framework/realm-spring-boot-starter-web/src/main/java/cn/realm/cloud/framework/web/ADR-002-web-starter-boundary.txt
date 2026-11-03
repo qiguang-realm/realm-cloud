@@ -1,0 +1,286 @@
+ADR-002：realm-spring-boot-starter-web 模块职责边界
+================================================================================
+
+项目            内容
+--------------------------------------------------------------------------------
+ADR 编号        ADR-002
+标题            realm-spring-boot-starter-web 模块职责边界与交付规范
+状态            提议（Proposed）
+日期            2026-11-03
+决策依据        国际标准 + 全球领先企业公开规范/最佳实践
+关联            ADR-001（模块分包方案）、realm-core 技术契约下沉决策
+影响模块        realm-spring-boot-starter-web、realm-core、各业务应用的 Web 层
+--------------------------------------------------------------------------------
+
+
+1. 背景与问题陈述
+================================================================================
+
+realm-spring-boot-starter-web 当前 POM 同时引入了 Spring Security（provided）、
+Knife4j、springdoc、RPC starter（optional）、Guava（provided）、Jsoup、
+OpenTelemetry API 等，<description> 中列举了“全局异常处理、API 日志、脱敏、
+错误码、W3C Trace Context 过滤器”等能力，但没有一份可审阅的边界声明说明
+“什么该进、什么不该进、依据是什么”。
+
+由此产生三个具体问题：
+
+1）职责漂移
+   spring-security-core 以 provided 引入，注释写“仅 GlobalExceptionHandler 使用”，
+   但没有机制阻止后续有人添加 SecurityFilterChain，模块会逐渐演变成
+   “Web + 安全”的混合体。
+
+2）依赖面失控
+   Knife4j 和 springdoc 作为 compile 依赖传递给所有下游应用；
+   RPC starter 作为 optional 依赖引入了与入站 HTTP 正交的出站调用能力，
+   依赖图不可预测。
+
+3）错误契约与标准背离
+   项目自定义 ApiResponse（HTTP 始终 200，业务 code 承载一切），
+   与 IETF RFC 9457 Problem Details 的核心设计相反，
+   前端网关、监控、HTTP 客户端无法通过状态码区分成功与失败。
+
+本 ADR 的决策是：为该模块建立一份以国际标准为依据的职责边界契约，
+并通过构建配置与自动化规则强制执行。边界声明不依赖个人偏好，
+每一条 In Scope / Out of Scope 均可追溯至公开规范。
+
+
+2. 决策
+================================================================================
+
+2.1 模块定位（一句话）
+--------------------------------------------------------------------------------
+
+realm-spring-boot-starter-web 提供 HTTP 传输层横切关注点的可组合、可退让的
+自动配置。它不包含业务语义，不强制认证授权，不替代安全专用 starter，
+不规定业务错误码。
+
+“可退让”指所有能力必须包裹在 @ConditionalOnMissingBean / @ConditionalOnClass /
+@ConditionalOnProperty 中，应用可完全覆盖或关闭任一能力。
+
+
+2.2 范围（In Scope）
+--------------------------------------------------------------------------------
+
+编号  能力                                      标准依据                                              交付形式                                      默认状态
+----  ----------------------------------------  ----------------------------------------------------  --------------------------------------------  ----------
+1     RFC 9457 ProblemDetail 异常映射           IETF RFC 9457；Azure REST API Guidelines             @RestControllerAdvice，application/problem+json  启用
+2     校验异常到 HTTP 状态的标准化转换          RFC 9457；Spring MVC 标准                           MethodArgumentNotValidException / ConstraintViolationException → 400  启用
+3     W3C Trace Context 传播                    W3C Trace Context；Azure Guidelines（可追踪性）      Filter，@ConditionalOnClass(OpenTelemetry.class)  条件启用
+4     请求/响应日志与敏感数据脱敏机制           OWASP ASVS V8、V9                                    可配置 Filter + @ConfigurationProperties      默认不打印完整 body
+5     分页参数 Web 层绑定                       项目内 PageParam 契约（realm-core）                 HandlerMethodArgumentResolver                启用
+6     版本号提取抽象                            Azure REST API Guidelines（从第一版开始版本化）      Resolver / Filter，不规定版本方案             启用
+7     安全响应头与 CORS 基础配置                OWASP ASVS V8 / API Security Top 10 API8:2023        WebMvcConfigurer，@ConditionalOnMissingBean    启用
+8     自动配置元数据                            Spring Boot 官方自动配置指南                         spring-boot-autoconfigure-processor（optional）  构建期
+
+
+2.3 明确排除（Out of Scope）
+--------------------------------------------------------------------------------
+
+编号  排除项                                                              理由                                                                标准/依据
+----  ------------------------------------------------------------------  ------------------------------------------------------------------  ----------------------------------------------
+1     Spring Security 完整配置（SecurityFilterChain、JWT 解码、授权规则、 认证授权是安全专用 starter 的职责；RFC 9700 区分 client 与             RFC 9700；OWASP ASVS V2/V3
+      @EnableWebSecurity）                                                resource server 的安全关注点
+2     RPC 出站调用（realm-spring-boot-starter-rpc）                       入站 HTTP 适配与出站 RPC 是正交关注点；optional 依赖使依赖图不可预测  Spring Boot starter 定义
+3     OpenAPI 文档的强制绑定（Knife4j / springdoc 作为 compile 依赖）      文档生成不是所有 Web 服务的必需能力；Swagger UI 应由应用按需引入     Spring Boot starter 依赖最小化原则
+4     幂等性的存储层实现                                                  Web 层只能提取 Idempotency-Key 并放入请求上下文；幂等语义需存储层参与  Stripe API 设计
+5     业务错误码枚举                                                      模块提供映射机制，具体错误码由各应用模块定义                          RFC 9457（type URI 可扩展）
+6     toResponseEntity() 等 Web 类型泄漏到 realm-core                   realm-core 保持纯数据契约；Web 包装由 starter 的 ResponseBodyAdvice 完成  分层原则
+
+
+2.4 错误契约的过渡策略
+--------------------------------------------------------------------------------
+
+决策：默认使用 RFC 9457 ProblemDetail；ApiResponse 包裹作为可配置的可选项，
+通过 @ConditionalOnProperty 控制。
+
+理由：RFC 9457 的目标是“避免 API 各自定义错误响应格式”；ApiResponse 将 HTTP
+状态码语义浪费掉，与 Azure、Microsoft Graph、Google 错误模型的分层理念相反。
+但考虑到现有前端可能已有统一拦截契约，不强制一刀切，而是把选择权交给应用配置：
+
+realm:
+  web:
+    error:
+      format: problem-detail   # 默认；可选 api-response
+
+当 format=api-response 时，由 ResponseBodyAdvice 将 ProblemDetail 或正常返回值
+包装为 ApiResponse，realm-core 本身不感知 Web 层。
+
+
+3. 设计约束（Design Constraints）
+================================================================================
+
+以下约束是强制性的，违反者视为架构回归：
+
+1）所有 @Bean 必须条件装配：包裹在 @ConditionalOnMissingBean /
+   @ConditionalOnClass / @ConditionalOnProperty 中。
+   依据 Spring Boot 官方自动配置指南。
+
+2）非必要编译依赖标记为 optional：自动配置模块应在底层库缺席时“零影响”。
+   依据 Spring AI 模块化设计文档。
+
+3）spring-security-core 仅限异常类型映射：只允许 import AccessDeniedException、
+   AuthenticationException 等异常类型，禁止定义 SecurityFilterChain、
+   @EnableWebSecurity、@PreAuthorize 处理逻辑。
+
+4）OTel 依赖条件化：TraceContextFilter 包裹在
+   @ConditionalOnClass(OpenTelemetry.class)；OTel 缺席时退化为自管理 traceId，
+   不得因 no-op 实现静默失效。
+
+5）日志脱敏规则外部化：敏感字段（密码、令牌、身份证号、手机号）默认脱敏；
+   默认不打印完整请求体；规则通过 @ConfigurationProperties 配置。
+
+6）版本解析只提供抽象：不规定 query 参数 / header / 路径，由应用配置选择。
+
+7）错误响应默认 application/problem+json；ApiResponse 为可选包装。
+
+
+4. 模块内部结构
+================================================================================
+
+cn.realm.cloud.framework.web
+├── autoconfigure/            # @AutoConfiguration 类，全部条件装配
+├── exception/                # GlobalExceptionHandler + ProblemDetail 映射
+├── trace/                    # TraceContextFilter + 请求上下文
+├── logging/                  # 请求/响应日志 + 脱敏机制
+├── versioning/               # 版本解析 Resolver
+├── pagination/               # PageParam Resolver
+├── web/                      # WebMvcConfigurer 默认配置（CORS、响应头）
+└── properties/               # @ConfigurationProperties
+
+每个子包对应一个独立关注点，autoconfigure 中的配置类通过
+@ConditionalOnProperty 控制各能力启停。应用可只启用需要的部分，
+而非被迫接受全部行为。
+
+
+5. POM 调整要求
+================================================================================
+
+编号  调整项                                                  当前状态          目标状态                                                        理由
+----  ------------------------------------------------------  ----------------  --------------------------------------------------------------  ------------------------------------
+1     realm-spring-boot-starter-rpc                           optional          移除                                                            入站/出站正交；依赖图不可预测
+2     knife4j-openapi3-jakarta-spring-boot-starter            compile           optional 或移除                                                 文档非所有服务必需；Swagger UI 不应传递
+3     springdoc-openapi-starter-webmvc-ui                     compile           provided 或 optional                                            仅保证 @Schema 编译期可用
+4     jsoup                                                   compile           确认用途后决定：若用于入站 XSS 清洗，改为 optional 或移出       XSS 时机因架构而异，避免强制绑定
+5     opentelemetry-api                                       compile           保持 compile，但代码必须 @ConditionalOnClass                   编译期需要，运行时退化为自管理 traceId
+6     spring-boot-autoconfigure-processor                     缺失              新增，optional                                                  生成自动配置提前过滤元数据（Spring Boot 官方建议）
+7     guava                                                   provided          保持 provided                                                   仅工具类内部使用，应用自行提供
+8     spring-security-core                                    provided          保持 provided，但加约束（见 §3.3）                              仅异常类型映射
+9     spring-boot-configuration-processor                     optional          保持                                                            IDE 配置提示
+
+
+6. 验证方式（Verification）
+================================================================================
+
+边界声明必须关联自动化检查，否则仍只是文字。
+
+6.1 ArchUnit 规则（置于 ArchitectureTest）
+--------------------------------------------------------------------------------
+
+// 禁止 Web starter 中出现 SecurityFilterChain 类型的 @Bean
+@ArchTest
+static final ArchRule noSecurityFilterChainInWebStarter =
+    noClasses().that().resideInAPackage("cn.realm.cloud.framework.web..")
+        .should().dependOnClassesThat()
+        .haveFullyQualifiedName("org.springframework.security.web.SecurityFilterChain");
+
+// 禁止 @EnableWebSecurity
+@ArchTest
+static final ArchRule noEnableWebSecurity =
+    noClasses().that().resideInAPackage("cn.realm.cloud.framework.web..")
+        .should().beAnnotatedWith("org.springframework.security.config.annotation.web.configuration.EnableWebSecurity");
+
+// realm-core 不得出现业务语义类型（与 ADR-001 联动）
+@ArchTest
+static final ArchRule commonMustNotContainBusinessContracts =
+    noClasses().that().resideInAPackage("cn.realm.cloud.framework.common..")
+        .should().haveSimpleNameEndingWith("Dto")
+        .orShould().haveSimpleNameEndingWith("Facade")
+        .orShould().haveSimpleNameEndingWith("Event")
+        .orShould().haveSimpleNameEndingWith("DO");
+
+
+6.2 条件装配测试
+--------------------------------------------------------------------------------
+
+使用 ApplicationContextRunner 验证：缺少 OTel、缺少 Security、关闭某项能力时，
+自动配置不生效且不抛异常。
+
+
+6.3 依赖范围检查
+--------------------------------------------------------------------------------
+
+maven-enforcer-plugin 的 bannedDependencies / requireUpperBoundDeps，
+确保 optional 和 provided 不被意外放宽，确保
+realm-spring-boot-starter-rpc 不再出现在依赖树中。
+
+
+6.4 错误格式契约测试
+--------------------------------------------------------------------------------
+
+MockMvc 断言：业务异常响应 Content-Type: application/problem+json，
+包含 type、title、status、detail；format=api-response 时断言包裹结构。
+
+
+7. 后果
+================================================================================
+
+正面
+--------------------------------------------------------------------------------
+
+- 模块职责从“个人偏好”变为“可追溯至 RFC / OWASP / Azure Guidelines /
+  Spring 官方文档”的工程契约，架构讨论有据可依。
+- 依赖面收窄：移除 RPC optional、OpenAPI 传递依赖，下游应用的类路径可预测。
+- 错误契约与 IETF 标准对齐，网关、监控、HTTP 客户端可通过状态码判断结果；
+  同时保留 ApiResponse 兼容路径，迁移成本可控。
+- ArchUnit + enforcer + 条件装配测试形成三层门禁，边界不依赖 code review
+  的自觉性。
+
+
+负面 / 风险
+--------------------------------------------------------------------------------
+
+- ApiResponse 用户需要配置 realm.web.error.format=api-response 才能保持现有行为，
+  存在一次性迁移成本。
+- 移除 RPC optional 依赖可能影响个别“Web + RPC 一体”的应用，
+  需在应用侧显式引入 RPC starter。
+- jsoup 的用途需确认：若确为入站 XSS 清洗，改为 optional 后，
+  未引入 jsoup 的应用将失去该清洗能力，需在文档中说明。
+
+
+缓解
+--------------------------------------------------------------------------------
+
+- 迁移指南写入模块 README.md，列出 problem-detail 与 api-response
+  两种模式的响应示例。
+- 在父 POM 的 dependencyManagement 中保留 RPC starter 版本管理，
+  应用按需引入不受影响。
+
+
+8. 参考标准
+================================================================================
+
+1）IETF RFC 9457 — Problem Details for HTTP APIs（错误响应格式标准化）
+2）IETF RFC 9700 — Best Current Practice for OAuth 2.0 Security
+   （client / resource server 关注点分离）
+3）W3C Trace Context — 跨服务追踪上下文传播格式
+4）OWASP ASVS V8 / V9 — 错误处理与日志中的敏感数据、传输层数据保护
+5）OWASP API Security Top 10:2023 — API8:2023 Security Misconfiguration、
+   API3:2023 Broken Object Property Level Authorization
+6）Microsoft Azure REST API Guidelines — 一致性模式、可版本化契约、
+   从第一版开始版本化
+7）Spring Boot 官方文档 — 自动配置条件装配、starter 定义、
+   spring-boot-autoconfigure-processor
+8）Spring AI 模块化设计文档 — 自动配置模块的非测试依赖标记为 optional
+9）Stripe API 设计 — request tracing、idempotency、分页与版本控制并列的
+   核心能力
+
+
+9. 决策记录
+================================================================================
+
+日期          变更          决策人
+------------  ------------  ----------------
+2026-11-03    初始版本      架构组
+
+本 ADR 的边界声明不依赖个人偏好；任何 In Scope / Out of Scope 条目若需增删，
+必须附带可引用的标准依据，并同步更新 §6 的自动化验证规则。

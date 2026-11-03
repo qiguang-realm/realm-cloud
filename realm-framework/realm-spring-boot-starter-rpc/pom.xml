@@ -32,7 +32,7 @@
         <!-- 通用基础库：项目通用工具和基础类 / Common library: shared utilities and base classes -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-common</artifactId>
+            <artifactId>realm-core</artifactId>
         </dependency>
 
         <!-- 负载均衡：为 Feign 客户端提供客户端侧负载均衡 / Load balancing: client-side load balancing for Feign -->

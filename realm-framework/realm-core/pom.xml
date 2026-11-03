@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-core</artifactId>
+    <packaging>jar</packaging>
+
+    <!-- 项目信息 / Project information -->
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：纯技术契约 / Responsibility boundary: pure technical contracts
+        仅包含：PageResult、ApiResponse、BusinessException、通用枚举 / Only contains: PageResult, ApiResponse, BusinessException, common enums
+        不含业务语义，不含工具类，不含 Web 运行时逻辑 / No business semantics, no utilities, no web runtime logic
+        工具类请使用 realm-utils；Web 横切能力请使用 realm-web-spring-boot-starter / Use realm-utils for utilities; use realm-web-spring-boot-starter for web cross-cutting concerns
+    -->
+    <description>
+        纯技术契约：统一响应体、分页结构、业务异常基类、通用枚举。
+        不含业务语义、工具类或 Web 运行时逻辑。
+        Pure technical contracts: unified response, pagination, base business exception,
+        common enums. No business semantics, utilities, or web runtime logic.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            契约序列化：Jackson / Contract serialization: Jackson
+            契约类的 JSON 序列化/反序列化需要，是契约层的核心运行时依赖 / Required for JSON serialization/deserialization of contract classes; core runtime dependency of the contract layer
+            必须 compile，不能 provided：没有“容器”会为下游应用提供 Jackson / Must be compile, not provided: no container will provide Jackson for downstream apps
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+        </dependency>
+        <!-- Java 8 时间类型支持 / Java 8 date-time support -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+        <!--
+            OpenAPI 注解：@Schema 用于契约类的文档描述 / OpenAPI annotations: @Schema for contract class documentation
+            optional：仅在启用 OpenAPI 时生效，不传递到下游 / optional: only effective when OpenAPI is enabled; not propagated downstream
+        -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <scope>optional</scope>
+        </dependency>
+
+        <!--
+            参数校验 API：契约类上的 @NotNull 等注解 / Bean validation API: @NotNull etc. on contract classes
+            provided：由 Jakarta Bean Validation 实现（如 Hibernate Validator）提供 / provided: supplied by Jakarta Bean Validation implementation (e.g. Hibernate Validator)
+        -->
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            日志门面：契约类中的日志（如有） / Logging facade: logging in contract classes (if any)
+            provided：由 SLF4J 绑定（Logback/Log4j2）提供 / provided: supplied by SLF4J binding (Logback/Log4j2)
+        -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递 / optional: pure compile-time annotation processor; not needed at runtime, not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需 / Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 测试相关 / Testing -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

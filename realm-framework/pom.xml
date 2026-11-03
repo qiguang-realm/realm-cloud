@@ -21,7 +21,7 @@
 
     <!-- 模块定义（技术组件聚合，每个子模块代表一个组件） / Module definitions (aggregator of technical components; each submodule is one component) -->
     <modules>
-        <module>realm-common</module>
+        <module>realm-core</module>
         <module>realm-spring-boot-starter-mybatis</module>
         <module>realm-spring-boot-starter-redis</module>
         <module>realm-spring-boot-starter-web</module>
@@ -39,6 +39,7 @@
         <module>realm-spring-boot-starter-protection</module>
         <module>realm-spring-boot-starter-biz-tenant</module>
         <module>realm-spring-boot-starter-data-jpa</module>
+        <module>realm-utils</module>
     </modules>
 
     <!-- 项目信息：本模块是技术组件聚合层 / Project info: aggregator layer for technical components -->

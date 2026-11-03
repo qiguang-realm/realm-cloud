@@ -19,7 +19,8 @@
 
     <!-- 项目信息 / Project information -->
     <name>${project.artifactId}</name>
-    <description>服务监控模块，提供链路追踪、日志服务、指标收集等功能 / Service monitoring module: tracing, logging, and metrics collection</description>
+    <description>服务监控模块，提供链路追踪、日志服务、指标收集等功能 / Service monitoring module: tracing, logging, and metrics collection
+    </description>
     <!-- 请替换为实际项目地址 / Replace with actual project URL -->
     <url>https://github.com/</url>
 
@@ -29,7 +30,7 @@
         <!-- 通用基础库 / Common library -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-common</artifactId>
+            <artifactId>realm-core</artifactId>
         </dependency>
 
         <!-- AOP 切面支持（用于监控拦截） / AOP support (for monitoring interception) -->
@@ -52,28 +53,50 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- OpenTelemetry API：编译期需要，运行时由 Java Agent 或本模块自动配置提供 -->
+        <!--
+            OpenTelemetry API：compile 作用域。
+            realm-core 中的 TraceContextFilter 在运行时直接使用
+            io.opentelemetry.api.trace.Span / io.opentelemetry.api.OpenTelemetry，
+            API 由 realm-core 以 compile 传递；此处显式声明是为了让本模块
+            对 OTel API 的依赖不依赖传递路径，避免未来 realm-core 调整时
+            本模块编译失败。版本由父 POM 的 opentelemetry-bom 统一管理。
+        -->
         <dependency>
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-api</artifactId>
-            <scope>provided</scope>
         </dependency>
 
-        <!-- OpenTelemetry SDK：本模块负责初始化 TracerProvider，optional 不向下传递 -->
+        <!--
+            OpenTelemetry SDK：compile 作用域，不是 optional。
+            本模块的自动配置类负责构建 SdkTracerProvider（见 MonitorAutoConfiguration），
+            运行时必须有 SDK 类才能初始化。optional 会让本依赖不传递给
+            realm-module-system-server 等使用方，导致启动时
+            NoClassDefFoundError: io/opentelemetry/sdk/trace/SdkTracerProvider。
+        -->
         <dependency>
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-sdk</artifactId>
-            <optional>true</optional>
         </dependency>
 
-        <!-- OpenTelemetry OTLP 导出器：将 Trace 数据发送到 Collector -->
+        <!--
+            OpenTelemetry OTLP 导出器：compile 作用域，不是 optional。
+            自动配置在启用 OTLP 导出时会构建 OtlpGrpcSpanExporter，
+            该类必须在使用方运行时类路径上。exporter-otlp 会传递引入
+            grpc / protobuf 等依赖，是本模块依赖树中较重的一部分；
+            如果确认业务上只走 Java Agent 或 SkyWalking，不需要自建 OTLP 导出，
+            应该删除本依赖而不是改回 optional（见下方"两种运行时路径"说明）。
+        -->
         <dependency>
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-exporter-otlp</artifactId>
-            <optional>true</optional>
         </dependency>
 
-        <!-- OpenTelemetry SDK 自动配置扩展：支持通过环境变量/系统属性配置 -->
+        <!--
+            OpenTelemetry SDK 自动配置扩展：optional。
+            本模块的自动配置类直接使用 SDK 的 Builder API，不依赖本扩展；
+            保留 optional 是为了让使用方在需要"通过环境变量 / 系统属性
+            配置 OTel SDK"时可以自行引入，而不是被强行加入依赖树。
+        -->
         <dependency>
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-sdk-extension-autoconfigure</artifactId>

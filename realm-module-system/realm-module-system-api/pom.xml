@@ -31,7 +31,7 @@
         <!-- 基础依赖：通用工具类与基础 POJO / Foundation: common utilities & base POJOs -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-common</artifactId>
+            <artifactId>realm-core</artifactId>
         </dependency>
 
         <!-- 接口文档支持（provided：使用最新版 Swagger 模型，运行时由具体模块提供实现） / API documentation support (provided: latest Swagger models, runtime impl provided by consumer) -->

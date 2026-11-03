@@ -29,7 +29,7 @@
         <!-- 通用基础库 / Common library -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-common</artifactId>
+            <artifactId>realm-core</artifactId>
         </dependency>
 
         <!-- 安全组件（可选：使用 DeptDataPermissionRule 时需要） / Security starter (optional: required for DeptDataPermissionRule) -->

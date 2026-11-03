@@ -30,7 +30,7 @@
         <!-- Realm 通用基础库 / Realm common base library -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-common</artifactId>
+            <artifactId>realm-core</artifactId>
         </dependency>
 
         <!-- 接口文档支持（provided：使用最新版 Swagger 模型，运行时实现由具体模块提供） / API documentation support (provided: latest Swagger models, runtime impl provided by consumer) -->

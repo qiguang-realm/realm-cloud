@@ -44,7 +44,6 @@ import org.springframework.core.Ordered;
  * @author QI Guang
  * @see TraceContextFilter
  * @see TraceContextProperties
- * @since 1.0.0
  */
 @AutoConfiguration
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)

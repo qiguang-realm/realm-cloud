@@ -26,10 +26,16 @@
     <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
     <dependencies>
 
-        <!-- 通用基础库 / Common library -->
+        <!-- 技术契约：realm-core / Technical contracts: realm-core -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-common</artifactId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!-- 通用工具类：realm-utils / General utilities: realm-utils -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
         </dependency>
 
         <!-- Spring Boot 核心 starter / Spring Boot core starter -->
@@ -45,27 +51,40 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Web 支持（provided：仅在 ExcelUtils 中使用） / Web support (provided: used only by ExcelUtils) -->
+        <!--
+            Web 支持：optional，仅在 FastExcelUtil 的 Web 导出能力中使用。
+            标记为 optional 而非 provided，原因：
+              - provided 语义是“运行时由容器提供”，但 spring-web 由应用自身通过 spring-boot-starter-web 引入，并非容器自带；
+              - optional 更准确地表达“导出功能需要时由调用方自备 spring-web”，
+                非 Web 模块引用本 Starter 不会被动引入，也避免运行时 NoClassDefFoundError。
+            Web support: optional, only used by FastExcelUtil's web export.
+            Marked as optional rather than provided because spring-web is supplied by the
+            application (via spring-boot-starter-web), not by the servlet container.
+        -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-web</artifactId>
-            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
 
-        <!-- Servlet API（provided：仅在 ExcelUtils 中使用） / Servlet API (provided: used only by ExcelUtils) -->
+        <!--
+            Servlet API：由 Servlet 容器（Tomcat/Jetty 等）在运行时提供，provided 语义正确。
+            Servlet API: provided at runtime by the servlet container (Tomcat/Jetty, etc.).
+        -->
         <dependency>
             <groupId>jakarta.servlet</groupId>
             <artifactId>jakarta.servlet-api</artifactId>
             <scope>provided</scope>
         </dependency>
 
-        <!-- 工具类库：FastExcel / Utility libraries: FastExcel -->
+        <!-- 工具类库：Apache Fesod (Incubating)（Excel 读写，FastExcel 的 Apache 演进版） -->
         <dependency>
-            <groupId>cn.idev.excel</groupId>
-            <artifactId>fastexcel</artifactId>
+            <groupId>org.apache.fesod</groupId>
+            <artifactId>fesod-sheet</artifactId>
+            <!-- 版本由父 BOM 统一管控，此处不指定 -->
         </dependency>
 
-        <!-- 工具类库：Google Guava / Utility libraries: Google Guava -->
+        <!-- 工具类库：Google Guava（集合、缓存、并发等工具） / Utility libraries: Google Guava (collections, cache, concurrency, etc.) -->
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
