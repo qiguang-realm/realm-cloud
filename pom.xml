@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <!-- POM 模型版本（必需） / POM model version (required) -->
     <modelVersion>4.0.0</modelVersion>
@@ -15,28 +16,88 @@
     <!-- 项目信息 / Project information -->
     <name>${project.artifactId}</name>
     <description>
-        Parent POM for the Realm project, centralizing dependency version management
-        and build plugin configurations for all submodules.
+        Realm 项目的顶层父 POM：聚合所有子模块，导入统一的依赖管理 BOM，
+        并提供编译器、测试、打包、版本扁平化的全局插件配置。
+        Top-level parent POM for Realm: aggregates all submodules, imports the central
+        dependency-management BOM, and provides global plugin configuration for
+        compilation, testing, packaging, and version flattening.
     </description>
-    <url>https://github.com/your-org/realm</url>
+    <url>https://github.com/qiguang-realm/java-realm</url>
 
-    <!-- 模块定义（按字母排序） / Module definitions (sorted alphabetically) -->
+    <!--
+        模块定义 / Module definitions
+        按职责分层排列：依赖管理 → 框架组件 → 独立应用 → 业务模块 → 启动入口
+        Ordered by layer: dependency management → framework components → standalone apps →
+        business modules → startup entry
+
+        注意：Maven 的构建顺序由模块间依赖决定，不由 <modules> 顺序决定；
+        此处顺序仅用于阅读，反映逻辑分层。
+        Note: Maven's build order is determined by inter-module dependencies, not by
+        <modules> order; the order here is for readability only and reflects logical layering.
+    -->
     <modules>
+
+        <!-- 依赖管理 BOM（版本单一来源） / Dependency management BOM (single source of truth) -->
         <module>realm-dependencies</module>
-        <module>realm-framework</module>
+
+        <!-- 框架组件聚合层（所有 starter） / Framework component aggregator (all starters) -->
+        <module>realm-framework-parent</module>
+
+        <!-- 独立应用：API 网关 / Standalone application: API gateway -->
         <module>realm-gateway</module>
-        <module>realm-module-infra</module>
-        <module>realm-module-system</module>
+
+        <!--
+            业务模块：核心领域 / Business modules: core domain
+            承载主要业务逻辑，未来最可能按阈值提取为微服务
+            Carry the primary business logic; most likely to be extracted as microservices
+            when the thresholds are met
+        -->
+        <module>realm-workforce-identity</module>
+        <module>realm-customer</module>
+        <module>realm-payment</module>
+        <module>realm-intelligence</module>
+
+        <!--
+            业务模块：支撑子域 / Business modules: supporting subdomain
+            为业务模块提供通用能力，通常不优先提取
+            Provide shared capabilities to business modules; typically not extracted first
+        -->
+        <module>realm-platform</module>
+        <module>realm-devtools</module>
+        <module>realm-analytics</module>
+
+        <!--
+            启动入口：聚合业务模块的 Spring Boot 应用
+            Startup entry: Spring Boot app aggregating business modules
+            模块化单体的唯一可运行入口；本地开发 / 集成测试 / 单机演示均通过它启动。
+            生产环境按当前演进阶段部署：
+            - 模块化单体阶段：直接部署本模块；
+            - 部分模块已提取微服务阶段：本模块承载剩余未提取的模块。
+            The sole runnable entry point of the modular monolith; local development /
+            integration testing / single-node demos all start from it. Production deployment
+            depends on the current evolution stage:
+            - modular monolith stage: deploy this module directly;
+            - partially-extracted microservices stage: this module hosts the remaining modules.
+        -->
         <module>realm-server</module>
-        <module>realm-module-report</module>
-        <module>realm-module-member</module>
-        <module>realm-module-ai</module>
-        <module>realm-module-pay</module>
+
     </modules>
 
-    <!-- 属性（版本单一来源） / Properties (single source of truth for versions) -->
+    <!--
+        属性（版本单一来源） / Properties (single source of truth for versions)
+        注意：以下版本属性与 realm-dependencies 中的对应属性必须保持严格一致。
+        原因：annotationProcessorPaths 和 pluginManagement 无法从 BOM 的
+        dependencyManagement 继承版本，必须在父 POM 中显式声明；而 BOM 中的
+        依赖版本又必须与这些属性对齐。两处同步是 Maven 多模块项目的已知约束。
+        Note: the following version properties MUST stay in sync with the corresponding
+        properties in realm-dependencies. Reason: annotationProcessorPaths and
+        pluginManagement cannot inherit versions from a BOM's dependencyManagement,
+        so they must be declared explicitly in the parent POM; the BOM's dependency
+        versions must in turn align with these properties. This two-place sync is a
+        known Maven multi-module constraint.
+    -->
     <properties>
-        <!-- 项目版本 / Project version -->
+        <!-- 项目版本（与 realm-dependencies 中的 revision 必须一致） / Project version (must match revision in realm-dependencies) -->
         <revision>2026.08-SNAPSHOT</revision>
 
         <!-- JDK 版本 / JDK version -->
@@ -49,17 +110,21 @@
         <maven-surefire-plugin.version>3.5.3</maven-surefire-plugin.version>
         <flatten-maven-plugin.version>1.7.2</flatten-maven-plugin.version>
 
-        <!-- 核心依赖版本 / Core dependency versions -->
+        <!--
+            以下依赖版本仅用于 annotationProcessorPaths 与 pluginManagement，
+            必须与 realm-dependencies 中的对应属性保持一致。
+            The following dependency versions are used only by annotationProcessorPaths
+            and pluginManagement; they must stay in sync with realm-dependencies.
+        -->
         <spring-boot.version>3.5.15</spring-boot.version>
-        <lombok.version>1.18.38</lombok.version>
+        <lombok.version>1.18.48</lombok.version>
         <mapstruct.version>1.6.3</mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
     </properties>
 
-    <!-- 依赖管理（仅版本，不实际导入） / Dependency management (versions only, no actual imports) -->
+    <!-- 依赖管理：只导入 BOM，不直接声明依赖 / Dependency management: import the BOM only -->
     <dependencyManagement>
         <dependencies>
-            <!-- 导入 BOM 模块以集中管理所有第三方依赖版本 / Import the BOM module to centrally manage all third-party dependency versions -->
             <dependency>
                 <groupId>cn.realm.cloud</groupId>
                 <artifactId>realm-dependencies</artifactId>
@@ -72,10 +137,25 @@
 
     <!-- 构建配置 / Build configuration -->
     <build>
-        <!-- 插件管理（子模块继承的默认配置） / Plugin management (default configurations inherited by submodules) -->
+
+        <!--
+            插件管理（子模块继承的默认配置） / Plugin management (defaults inherited by submodules)
+            注意：pluginManagement 只提供版本与配置，不会自动激活插件；
+            子模块需要在 <build><plugins> 中显式声明才会生效。
+            Note: pluginManagement only supplies versions and configuration; it does not
+            activate plugins. Submodules must declare them in <build><plugins> to take effect.
+        -->
         <pluginManagement>
             <plugins>
-                <!-- 编译器插件：为 Lombok 和 MapStruct 配置注解处理器 / Compiler plugin: configures annotation processors for Lombok and MapStruct -->
+
+                <!--
+                    编译器插件：为 Lombok 与 MapStruct 配置注解处理器
+                    Compiler plugin: configures annotation processors for Lombok and MapStruct
+                    顺序要求：Lombok 在 MapStruct 之前，确保生成的 getter/setter 对 MapStruct 可见；
+                    lombok-mapstruct-binding 显式声明两者的协作绑定。
+                    Order: Lombok before MapStruct so generated getters/setters are visible to
+                    MapStruct; lombok-mapstruct-binding declares their collaboration binding.
+                -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
@@ -95,7 +175,7 @@
                                 <artifactId>lombok</artifactId>
                                 <version>${lombok.version}</version>
                             </path>
-                            <!-- Lombok-MapStruct 绑定，确保二者协同工作 / Lombok-MapStruct binding to ensure they work together -->
+                            <!-- Lombok-MapStruct 绑定 / Lombok-MapStruct binding -->
                             <path>
                                 <groupId>org.projectlombok</groupId>
                                 <artifactId>lombok-mapstruct-binding</artifactId>
@@ -121,18 +201,36 @@
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>${maven-surefire-plugin.version}</version>
                 </plugin>
-                <!-- Spring Boot 打包插件（统一版本，子模块无需再写 version） / Spring Boot Maven Plugin (unified version, submodules omit version) -->
+
+                <!--
+                    Spring Boot 打包插件 / Spring Boot Maven plugin
+                    子模块需要显式声明才能启用 repackage；父 POM 只统一版本。
+                    典型启用者：realm-server（模块化单体的唯一可运行入口）、realm-gateway
+                    （独立部署的 API 网关）。
+                    Submodules must declare it explicitly to enable repackage; the parent
+                    POM only unifies the version. Typical enablers: realm-server (the sole
+                    runnable entry of the modular monolith) and realm-gateway (standalone
+                    API gateway).
+                -->
                 <plugin>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <version>${spring-boot.version}</version>
                 </plugin>
+
             </plugins>
         </pluginManagement>
 
         <!-- 全局插件（应用于所有模块） / Global plugins (applied to all modules) -->
         <plugins>
-            <!-- Flatten Maven 插件：发布时将 ${revision} 替换为实际版本 / Flatten Maven Plugin: replaces ${revision} with actual version during release -->
+
+            <!--
+                Flatten Maven 插件：发布时将 ${revision} 替换为实际版本
+                Flatten Maven Plugin: replaces ${revision} with the actual version during release
+                resolveCiFriendliesOnly：只解析 CI 友好的版本占位符，不重写 POM 的其他部分
+                resolveCiFriendliesOnly: resolves only CI-friendly version placeholders,
+                leaving the rest of the POM untouched
+            -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>flatten-maven-plugin</artifactId>
@@ -158,9 +256,13 @@
                     </execution>
                 </executions>
             </plugin>
+
         </plugins>
     </build>
 
-    <!-- 建议：在 ~/.m2/settings.xml 中配置镜像仓库，而不是在项目 POM 中配置 / Recommendation: configure mirrors in ~/.m2/settings.xml instead of project POM -->
+    <!--
+        仓库镜像建议：在 ~/.m2/settings.xml 中配置，而不是在项目 POM 中
+        Repository mirror recommendation: configure in ~/.m2/settings.xml, not in the project POM
+    -->
 
 </project>

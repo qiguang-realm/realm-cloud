@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-multitenancy-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：租户上下文的生命周期管理（SaaS 底座横切能力）
+        Responsibility boundary: tenant context lifecycle management
+        (SaaS foundation cross-cutting capability)
+        仅包含：租户解析 SPI、线程安全的租户上下文、请求边界清理、
+                可插拔的上下文传播、隔离策略注入点
+        Only contains: tenant resolution SPI, thread-safe tenant context,
+                request-boundary cleanup, pluggable context propagation,
+                isolation-strategy injection point
+        不包含：任何具体隔离策略实现（共享表 tenant_id / 独立 Schema / 独立库）、
+                数据源路由、SQL 改写、缓存 key 隔离、权限判断、业务逻辑
+        Does not contain: any concrete isolation strategy (shared-table tenant_id /
+                schema-per-tenant / database-per-tenant), datasource routing, SQL rewriting,
+                cache-key isolation, authorization, or business logic
+        隔离模型由应用通过 SPI 注入；本模块只确定并传递“租户是谁”，不决定“数据怎么隔离”
+        Isolation model is injected by the application via SPI; this module only determines
+        and propagates "who the tenant is", not "how data is isolated"
+    -->
+    <description>
+        SaaS 多租户底座：租户解析 SPI、线程安全的租户上下文、请求边界清理、可插拔的上下文传播。
+        不实现任何具体隔离策略（共享表/Schema/独立库），隔离模型由应用通过 SPI 注入。
+        SaaS multitenancy foundation: tenant resolution SPI, thread-safe tenant context,
+        request-boundary cleanup, pluggable context propagation.
+        No concrete isolation strategy (shared-table/schema/database) is implemented;
+        isolation model is injected by the application via SPI.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、SubjectContext 接口；租户缺失、租户标识非法时
+            抛出 BusinessException（携带错误码），由 realm-web 的
+            GlobalExceptionHandler 统一转换，本模块不处理 HTTP 响应
+            Provides BusinessException, SubjectContext interface; exceptions for
+            missing tenant or invalid tenant identifier throw BusinessException
+            (with an error code), which realm-web's GlobalExceptionHandler converts;
+            this module does not handle HTTP responses
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合等工具；租户标识归一化、上下文属性操作需要
+            Provides string, collection utilities; needed for tenant identifier
+            normalization and context attribute handling
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Auto-configuration foundation
+            提供条件装配、配置属性绑定；本模块的自动配置类与配置属性类直接依赖
+            Provides conditional assembly and configuration property binding; this module's
+            auto-configuration and configuration-property classes depend on it directly
+            compile：自动配置类直接使用；传递引入 spring-boot（提供 @ConfigurationProperties），
+            本模块不再单独声明 spring-boot
+            compile: auto-configuration classes use it directly; transitively brings
+            spring-boot (which provides @ConfigurationProperties); no separate spring-boot
+            declaration needed
+            与 realm-data-access、realm-data-jpa、realm-data-redis、
+            realm-distributed-transaction、realm-feature-env、realm-file、
+            realm-messaging 等模块风格一致
+            Consistent with realm-data-access, realm-data-jpa, realm-data-redis,
+            realm-distributed-transaction, realm-feature-env, realm-file, and
+            realm-messaging
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            Spring Context（compile）：轻量 IoC 基础
+            Spring Context (compile): lightweight IoC foundation
+            提供 @Configuration / @Bean / @Component / ApplicationContext /
+            ApplicationEventPublisher 等核心 IoC 能力；不强制 Web 栈
+            Provides @Configuration, @Bean, @Component, ApplicationContext,
+            ApplicationEventPublisher and other core IoC capabilities; does not force
+            a web stack
+            注意：本模块不再依赖 spring-context 提供 @ConfigurationProperties
+            或条件装配——这些由 spring-boot-autoconfigure 传递引入的 spring-boot 提供
+            Note: this module does not rely on spring-context for @ConfigurationProperties
+            or conditional assembly; those are provided by spring-boot, transitively
+            brought by spring-boot-autoconfigure
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+
+        <!--
+            Servlet API（provided）：Web 入站租户解析的可选实现
+            Servlet API (provided): optional implementation for web inbound tenant resolution
+            仅当需要从 X-Tenant-Id 请求头或子域名解析租户时使用；
+            HeaderTenantResolver、SubdomainTenantResolver、TenantContextFilter
+            通过 @ConditionalOnClass(jakarta.servlet.Filter.class) 条件化
+            Used only when resolving tenant from X-Tenant-Id header or subdomain;
+            HeaderTenantResolver, SubdomainTenantResolver, and TenantContextFilter are
+            gated by @ConditionalOnClass(jakarta.servlet.Filter.class)
+            provided：由 Web 容器提供；本模块不强制引入 Web 栈
+            provided: supplied by the web container; this module does not force a web stack
+        -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            自动配置元数据生成器（optional）：生成 spring-autoconfigure-metadata.properties
+            Autoconfigure metadata processor (optional)
+            启动时提前过滤不匹配的自动配置，降低启动开销
+            Pre-filters non-matching auto-configurations at startup to reduce boot cost
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；
+            用于验证上下文传播、请求边界清理、条件装配
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito;
+            used to verify context propagation, request-boundary cleanup, and
+            conditional assembly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产 / test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

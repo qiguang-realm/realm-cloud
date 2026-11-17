@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-payment</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：支付处理 / Responsibility boundary: payment processing
+        仅包含：支付单管理、支付渠道适配、交易流水、对账
+        Only contains: payment order management, payment channel adapters, transaction records,
+                reconciliation
+        不包含：订单/交易模块的业务逻辑（订单由独立的订单模块或应用层负责）；
+                财务/会计系统的记账逻辑
+        Does not contain: order/trade module business logic (orders are handled by an
+                independent order module or the application layer); finance/accounting
+                bookkeeping logic
+        本模块是模块化单体中的单 Maven 模块（库），由 realm-server 聚合启动；
+        不独立部署，不包含 spring-boot-maven-plugin 的 repackage。
+        This module is a single Maven module (library) in the modular monolith,
+        aggregated and started by realm-server; it is not deployed independently and does
+        not include spring-boot-maven-plugin's repackage.
+    -->
+    <description>
+        支付处理：支付单管理、支付渠道适配、交易流水、对账。
+        不承载订单/交易模块的业务逻辑。
+        Payment processing: payment order management, payment channel adapters,
+        transaction records, reconciliation.
+        No order/trade module business logic.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、SubjectContext、通用枚举；
+            支付失败、对账异常、渠道回调验签失败时抛出 BusinessException（携带错误码），
+            由 realm-web 的 GlobalExceptionHandler 统一转换，本模块不处理 HTTP 响应
+            Provides BusinessException, SubjectContext, common enums; payment failures,
+            reconciliation errors, and channel callback signature failures throw
+            BusinessException (with an error code), which realm-web's GlobalExceptionHandler
+            converts; this module does not handle HTTP responses
+            compile：契约在编译期与运行期都需要
+            compile: contracts are needed at compile and runtime
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合、日期、JSON 辅助等工具；金额计算（BigDecimal）、
+            签名校验、时间格式化需要
+            Provides string, collection, date, JSON helper utilities; needed for amount
+            calculation (BigDecimal), signature verification, and time formatting
+            compile：工具方法在编译期与运行期都需要
+            compile: utilities are needed at compile and runtime
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Auto-configuration foundation
+            本模块包含支付渠道的自动配置类与配置属性类，必须显式声明；
+            与 realm-data-access、realm-data-jpa、realm-data-redis 等模块风格一致
+            This module contains auto-configuration and configuration-property classes for
+            payment channels; declared explicitly for consistency with realm-data-access,
+            realm-data-jpa, realm-data-redis, etc.
+            compile：自动配置类直接使用
+            compile: auto-configuration classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            Spring Boot 基础：@Service / @Component / @Configuration / @Transactional
+            Spring Boot foundation: @Service / @Component / @Configuration / @Transactional
+            业务模块的 Bean 注册、依赖注入与本地事务基础；由父 POM 的依赖管理统一版本
+            Foundation for bean registration, dependency injection, and local transactions
+            in business modules; version managed by the parent POM
+            compile：业务类直接使用
+            compile: business classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            持久化：realm-mybatis-plus-spring-boot-starter（或 realm-data-jpa-spring-boot-starter）
+            Persistence: realm-mybatis-plus-spring-boot-starter (or realm-data-jpa-spring-boot-starter)
+            支付单、支付渠道配置、交易流水、对账差异的持久化
+            Persistence of payment orders, payment channel configurations, transaction
+            records, and reconciliation discrepancies
+            compile：本模块的核心运行时依赖（二选一）
+            compile: core runtime dependency of this module (pick one)
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-mybatis-plus-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            Web 层：realm-web-spring-boot-starter
+            Web layer: realm-web-spring-boot-starter
+            支付渠道回调接口（如微信支付/支付宝的异步通知）、管理后台的退款/查询接口
+            Payment channel callback endpoints (e.g., WeChat Pay/Alipay async notifications)
+            and admin backend refund/query APIs
+            compile：Controller 直接使用
+            compile: controllers use it directly
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-web-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            分布式锁与幂等：realm-stability-spring-boot-starter
+            Distributed lock & idempotency: realm-stability-spring-boot-starter
+            支付回调的幂等处理（防止同一笔回调被重复处理）、支付单创建的分布式锁
+            （防止并发重复创建）
+            Idempotency for payment callbacks (preventing the same callback from being
+            processed twice) and distributed locks for payment order creation (preventing
+            concurrent duplicate creation)
+            compile：支付场景的幂等是强需求
+            compile: idempotency is a hard requirement in payment scenarios
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-stability-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            消息队列（可选）：realm-messaging-spring-boot-starter
+            Messaging (optional): realm-messaging-spring-boot-starter
+            支付成功/失败事件发布，供其他模块（如订单、通知）消费
+            Publishes payment success/failure events for other modules (e.g., orders,
+            notifications) to consume
+            optional：如果支付模块只做同步通知（回调），不发布领域事件，可以移除；
+            但建议保留，因为支付结果通常需要异步通知多个下游模块
+            optional: if the payment module only does synchronous notification (callbacks)
+            and does not publish domain events, it can be removed; but retaining it is
+            recommended because payment results typically need async notification to
+            multiple downstream modules
+            compile：事件发布直接使用
+            compile: event publication is used directly
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-messaging-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            操作审计：realm-audit-logging-spring-boot-starter
+            Operational audit logging: realm-audit-logging-spring-boot-starter
+            退款发起、支付渠道配置修改等敏感操作需要审计；通过 @AuditLog 注解
+            Sensitive operations like refund initiation and payment channel configuration
+            changes need auditing; through the @AuditLog annotation
+            compile：@AuditLog 注解直接使用
+            compile: the @AuditLog annotation is used directly
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-audit-logging-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            三方支付 SDK（按实际接入的渠道选择） / Third-party payment SDKs (select based on actual channels)
+        -->
+
+        <!--
+            微信支付：weixin-java-pay
+            WeChat Pay: weixin-java-pay
+            如果本模块需要接入微信支付，引入此依赖；
+            版本由 realm-dependencies 的 weixin-java.version 管理
+            If this module needs to integrate WeChat Pay, introduce this dependency;
+            version managed by realm-dependencies' weixin-java.version
+        -->
+        <dependency>
+            <groupId>com.github.binarywang</groupId>
+            <artifactId>weixin-java-pay</artifactId>
+        </dependency>
+
+        <!--
+            支付宝：alipay-sdk-java
+            Alipay: alipay-sdk-java
+            如果本模块需要接入支付宝，引入此依赖；
+            版本由 realm-dependencies 的 alipay-sdk-java.version 管理；
+            已在 BOM 中排除 bcprov-jdk15on 和 fastjson 1.x
+            If this module needs to integrate Alipay, introduce this dependency;
+            version managed by realm-dependencies' alipay-sdk-java.version;
+            bcprov-jdk15on and fastjson 1.x are already excluded in the BOM
+        -->
+        <dependency>
+            <groupId>com.alipay.sdk</groupId>
+            <artifactId>alipay-sdk-java</artifactId>
+        </dependency>
+
+        <!--
+            注意：本模块不引入 realm-workforce-identity。
+            支付模块不需要知道"操作人是谁"的完整用户信息，只需要 SubjectContext 中的
+            userId。如果支付场景需要记录操作人，通过 SubjectContext 获取 userId 即可，
+            不需要引入完整的身份模块。这避免了支付模块对身份模块的强依赖。
+            Note: this module does NOT introduce realm-workforce-identity.
+            The payment module does not need complete user information about "who is the
+            operator"; it only needs the userId from SubjectContext. If the payment scenario
+            needs to record the operator, obtaining userId from SubjectContext is sufficient,
+            avoiding a hard dependency on the identity module.
+        -->
+
+        <!--
+            注意：本模块不引入 realm-customer。
+            支付只关心"这笔钱是否成功"，不关心"是谁付的钱"（会员详情）。
+            如果支付成功后需要通知客户（如发送支付成功消息），通过 realm-messaging
+            发布事件，由 realm-customer 或通知模块消费。
+            Note: this module does NOT introduce realm-customer.
+            Payment only cares about "whether the money succeeded", not "who paid"
+            (customer details). If the customer needs to be notified after payment success
+            (e.g., sending a payment success message), publish an event via realm-messaging
+            and let realm-customer or the notification module consume it.
+        -->
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产
+            test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

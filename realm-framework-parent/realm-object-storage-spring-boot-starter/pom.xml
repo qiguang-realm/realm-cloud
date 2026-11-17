@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-object-storage-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：对象存储统一抽象 + S3 协议实现
+        Responsibility boundary: unified object storage abstraction + S3 protocol implementation
+        仅包含：ObjectStorageTemplate 统一接口、基于 AWS SDK v2 S3 的默认实现
+                （兼容 MinIO / 阿里云 OSS / 腾讯云 COS 等 S3 兼容端点）、
+                可选的厂商特有 SDK 适配（MinIO / 阿里云 OSS）、条件装配与配置属性
+        Only contains: ObjectStorageTemplate unified interface, default implementation based on
+                AWS SDK v2 S3 (compatible with MinIO / Aliyun OSS / Tencent COS and other
+                S3-compatible endpoints), optional vendor-specific SDK adapters (MinIO / Aliyun OSS),
+                conditional assembly and configuration properties
+        不包含：文件格式解析（由 realm-file-spring-boot-starter 负责）、业务文件管理逻辑、存储服务端实现
+        Does not contain: file format parsing (handled by realm-file-spring-boot-starter),
+                business file management logic, or storage server implementation
+        业务代码面向 ObjectStorageTemplate 编程，不绑定 AWS SDK / MinIO SDK / 阿里云 OSS SDK 的具体类型
+        Business code programs against ObjectStorageTemplate, not bound to AWS SDK / MinIO SDK /
+        Aliyun OSS SDK concrete types
+        依据：S3 协议已成为对象存储的事实标准，多数厂商提供 S3 兼容端点；
+        统一抽象 + 可替换实现是企业级 OSS Starter 的主流模式
+        Basis: S3 protocol is the de facto standard for object storage; most vendors provide
+        S3-compatible endpoints; unified abstraction + replaceable implementations is the
+        mainstream pattern for enterprise OSS starters
+    -->
+    <description>
+        对象存储统一抽象 + S3 协议实现：ObjectStorageTemplate 统一接口、基于 AWS SDK v2 S3 的默认实现
+        （兼容 MinIO / 阿里云 OSS / 腾讯云 COS 等 S3 兼容端点）、可选的厂商特有 SDK 适配。
+        不包含文件格式解析、业务文件管理逻辑、存储服务端实现。
+        Unified object storage abstraction + S3 protocol implementation: ObjectStorageTemplate interface,
+        default implementation based on AWS SDK v2 S3 (compatible with MinIO / Aliyun OSS / Tencent COS
+        and other S3-compatible endpoints), optional vendor-specific SDK adapters.
+        No file format parsing, business file management logic, or storage server implementation.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、通用枚举；上传/下载失败、存储桶不存在时
+            抛出 BusinessException（携带错误码），由 realm-web 的
+            GlobalExceptionHandler 统一转换，本模块不处理 HTTP 响应
+            Provides BusinessException, common enums; upload/download failures and
+            missing bucket errors throw BusinessException (with an error code), which
+            realm-web's GlobalExceptionHandler converts; this module does not handle
+            HTTP responses
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合、IO 等工具；对象键归一化、MIME 类型推断需要
+            Provides string, collection, IO utilities; needed for object key normalization
+            and MIME type inference
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Auto-configuration foundation
+            提供条件装配与配置属性绑定；本模块的自动配置类直接依赖
+            Provides conditional assembly and configuration property binding; this module's
+            auto-configuration classes depend on it directly
+            compile：自动配置基础设施，不可 optional
+            compile: auto-configuration infrastructure, cannot be optional
+            与 realm-data-access、realm-data-jpa、realm-data-redis、
+            realm-distributed-transaction、realm-feature-env、realm-file、
+            realm-messaging、realm-multitenancy、realm-mybatis-plus 等模块风格一致
+            Consistent with realm-data-access, realm-data-jpa, realm-data-redis,
+            realm-distributed-transaction, realm-feature-env, realm-file, realm-messaging,
+            realm-multitenancy, and realm-mybatis-plus
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            默认 S3 实现：AWS SDK v2 S3
+            Default S3 implementation: AWS SDK v2 S3
+            提供 S3Client、S3Presigner 等核心类型；基于 S3 协议的默认
+            ObjectStorageTemplate 实现依赖它
+            Provides S3Client, S3Presigner etc.; the default ObjectStorageTemplate
+            implementation based on S3 protocol depends on it
+            通过 endpointOverride 可连接 MinIO、阿里云 OSS、腾讯云 COS 等任何 S3 兼容端点
+            Via endpointOverride, it can connect to MinIO, Aliyun OSS, Tencent COS, or any
+            S3-compatible endpoint
+            compile：默认实现是 starter 的核心价值，必须随 starter 传递；
+            业务方无需手动引入 AWS SDK
+            compile: the default implementation is the core value of the starter and must
+            ship with it; consumers need not pull in AWS SDK manually
+            版本由父 POM 的 dependencyManagement 管理（awssdk.version）
+            Version managed by parent POM's dependencyManagement
+        -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+        </dependency>
+
+        <!--
+            可选：MinIO 官方 SDK（optional） / Optional: MinIO official SDK (optional)
+            如果应用需要使用 MinIO 的特有 API（如桶通知、对象锁定、生命周期规则）
+            而非仅 S3 兼容端点，可引入并启用 MinioObjectStorageTemplate
+            If the app needs MinIO-specific APIs (bucket notifications, object locking,
+            lifecycle rules) beyond S3-compatible endpoints, pull it in and enable
+            MinioObjectStorageTemplate
+            optional：不强制所有使用方携带 MinIO SDK；
+            相关配置类通过 @ConditionalOnClass(MinioClient.class) 条件化
+            optional: MinIO SDK is not forced onto all consumers; related configs gated by
+            @ConditionalOnClass(MinioClient.class)
+            版本由 realm-dependencies 的 minio.version 管理
+            Version managed by realm-dependencies' minio.version
+        -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            可选：阿里云 OSS 官方 SDK（optional） / Optional: Aliyun OSS official SDK (optional)
+            如果应用需要使用阿里云 OSS 的特有 API（如图片处理、视频截帧、合规 Retention）
+            而非仅 S3 兼容端点，可引入并启用 AliyunOssObjectStorageTemplate
+            If the app needs Aliyun OSS-specific APIs (image processing, video frame capture,
+            compliance retention) beyond S3-compatible endpoints, pull it in and enable
+            AliyunOssObjectStorageTemplate
+            optional：不强制所有使用方携带阿里云 OSS SDK；
+            相关配置类通过 @ConditionalOnClass(OSSClient.class) 条件化
+            optional: Aliyun OSS SDK is not forced onto all consumers; related configs gated
+            by @ConditionalOnClass(OSSClient.class)
+            版本由 realm-dependencies 的 aliyun-oss.version 管理
+            Version managed by realm-dependencies' aliyun-oss.version
+        -->
+        <dependency>
+            <groupId>com.aliyun.oss</groupId>
+            <artifactId>aliyun-sdk-oss</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            Micrometer（optional）：对象存储操作的可观测性
+            Micrometer (optional): observability for object storage operations
+            记录上传/下载耗时（Timer）、成功/失败计数（Counter），
+            标签包含 bucket、operation、result
+            Records upload/download latency (Timer) and success/failure counts (Counter),
+            tagged with bucket/operation/result
+            optional：MeterRegistry 缺席时降级为 no-op；
+            与 realm-stability 共享同一 MeterRegistry
+            optional: degrades to no-op when MeterRegistry is absent; shares the same
+            MeterRegistry with realm-stability
+        -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            自动配置元数据生成器（optional）：生成 spring-autoconfigure-metadata.properties
+            Autoconfigure metadata processor (optional)
+            启动时提前过滤不匹配的自动配置，降低启动开销
+            Pre-filters non-matching auto-configurations at startup to reduce boot cost
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；
+            用于验证默认 S3 实现、条件装配、配置绑定
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito; used to verify
+            default S3 implementation, conditional assembly, and config binding
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产 / test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

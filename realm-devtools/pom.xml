@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-devtools</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：研发工具 / Responsibility boundary: developer tools
+        仅包含：代码生成器、数据源管理、参数配置
+        Only contains: code generators, datasource management, parameter configuration
+        不包含：运维管理（定时任务、服务器信息等，归 realm-platform）；
+                底层基础设施（连接池、消息队列在 framework 层）；
+                运行时数据源路由（realm-data-access 的职责）
+        Does not contain: operations management (job scheduling, server info — belongs to
+        realm-platform); low-level infrastructure (connection pools, message queues are in
+        the framework layer); runtime datasource routing (the responsibility of realm-data-access)
+
+        定位说明：devtools 管理的是“元数据”——代码生成器的表结构元数据、数据源配置的
+        连接元数据、参数配置的键值元数据。它不承载运行时能力，例如数据源管理的产物是
+        DataSource 配置记录，而不是运行时 DataSource 实例（后者由 realm-data-access 创建）。
+        Positioning: devtools manages metadata — table structure metadata for code generators,
+        connection metadata for datasource configurations, key-value metadata for parameter
+        configurations. It does not carry runtime capabilities; for example, datasource
+        management produces DataSource configuration records, not runtime DataSource instances
+        (the latter is created by realm-data-access).
+
+        本模块是模块化单体中的单 Maven 模块（库），由 realm-server 聚合启动；
+        不独立部署，不包含 spring-boot-maven-plugin 的 repackage。
+        This module is a single Maven module (library) in the modular monolith, aggregated
+        and started by realm-server; it is not deployed independently and does not include
+        spring-boot-maven-plugin's repackage.
+    -->
+    <description>
+        研发工具：代码生成器、数据源管理、参数配置。
+        不含运维管理（realm-platform）；不含底层基础设施；不含运行时数据源路由。
+        管理元数据而非承载运行时能力。
+        Developer tools: code generators, datasource management, parameter configuration.
+        No operations management (realm-platform); no low-level infrastructure; no runtime
+        datasource routing. Manages metadata rather than carrying runtime capabilities.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、通用枚举；代码生成失败、数据源连接测试失败、
+            参数配置键冲突等复用这些契约
+            Provides BusinessException, common enums; code generation failures, datasource
+            connection test failures, and parameter key conflicts reuse these contracts
+            compile：契约在编译期与运行期都需要
+            compile: contracts are needed at compile and runtime
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合、日期、JSON 辅助等工具；表名驼峰转换、模板变量组装需要
+            Provides string, collection, date, JSON helper utilities; needed for table name
+            camel-case conversion and template variable assembly
+            compile：工具方法在编译期与运行期都需要
+            compile: utilities are needed at compile and runtime
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Auto-configuration foundation
+            本模块包含自动配置类与配置属性类，必须显式声明；
+            与 realm-data-access、realm-data-jpa 等模块风格一致
+            This module contains auto-configuration and configuration-property classes;
+            declared explicitly for consistency with realm-data-access, realm-data-jpa, etc.
+            compile：自动配置类直接使用
+            compile: auto-configuration classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            Spring Boot 基础：@Service / @Component / @Configuration / @Transactional
+            Spring Boot foundation: @Service / @Component / @Configuration / @Transactional
+            业务模块的 Bean 注册、依赖注入与本地事务基础；由父 POM 的依赖管理统一版本
+            Foundation for bean registration, dependency injection, and local transactions
+            in business modules; version managed by the parent POM
+            compile：业务类直接使用
+            compile: business classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            Web 层：realm-web-spring-boot-starter
+            Web layer: realm-web-spring-boot-starter
+            管理后台的 REST API（数据源管理、参数配置的 CRUD 接口）
+            Admin backend REST APIs (CRUD for datasource management and parameter configuration)
+            compile：Controller 直接使用
+            compile: controllers use it directly
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-web-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            持久化：realm-mybatis-plus-spring-boot-starter
+            Persistence: realm-mybatis-plus-spring-boot-starter
+            infra_data_source、infra_config、infra_codegen_table、
+            infra_codegen_column 等元数据表的持久化
+            Persistence of metadata tables like infra_data_source, infra_config,
+            infra_codegen_table, infra_codegen_column
+            compile：本模块的核心运行时依赖（如果团队选 JPA，替换为 realm-data-jpa）
+            compile: core runtime dependency of this module (if the team chooses JPA,
+            replace with realm-data-jpa)
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-mybatis-plus-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            代码生成器核心：mybatis-plus-generator
+            Code generator core: mybatis-plus-generator
+            提供 FastAutoGenerator、模板引擎、命名策略等代码生成能力
+            Provides FastAutoGenerator, template engine, naming strategy and other code
+            generation capabilities
+            compile：代码生成器（MyBatisPlusGenerator）直接使用
+            compile: the code generator (MyBatisPlusGenerator) uses it directly
+            版本由 realm-dependencies 的 mybatis-plus.version 统一管理
+            Version managed by realm-dependencies' mybatis-plus.version
+        -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-generator</artifactId>
+        </dependency>
+
+        <!--
+            模板引擎：Freemarker
+            Template engine: Freemarker
+            MyBatisPlusGenerator 中使用 FreemarkerTemplateEngine 渲染代码模板
+            MyBatisPlusGenerator uses FreemarkerTemplateEngine to render code templates
+            compile：代码生成器直接使用
+            compile: the code generator uses it directly
+            版本由 realm-dependencies 的 freemarker.version 统一管理（需在 BOM 中补充）
+            Version managed by realm-dependencies' freemarker.version (needs to be added to BOM)
+        -->
+        <dependency>
+            <groupId>org.freemarker</groupId>
+            <artifactId>freemarker</artifactId>
+        </dependency>
+
+        <!--
+            数据库驱动：MySQL
+            Database driver: MySQL
+            代码生成器连接数据库读取表结构（DatabaseMetaData）、数据源管理测试连接需要
+            The code generator connects to the database to read table structures
+            (DatabaseMetaData); datasource management needs it for connection testing
+            compile：测试连接和读取表结构直接使用
+            compile: used directly for connection testing and table structure reading
+            如果团队需要支持其他数据库，按需追加对应的驱动
+            If the team needs other databases, add the corresponding driver as needed
+            版本由 Spring Boot BOM 管理
+            Version managed by Spring Boot BOM
+        -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+        </dependency>
+
+        <!--
+            注意：本模块不引入 realm-platform。
+            运维管理（定时任务、服务器信息）与研发工具（代码生成器、数据源管理）
+            是两个不同的关注点，消费者不同（运维 vs 开发者），变更节奏不同。
+            Note: this module does NOT introduce realm-platform.
+            Operations management (job scheduling, server info) and developer tools
+            (code generators, datasource management) are different concerns with different
+            consumers (ops vs developers) and different change cadences.
+        -->
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产
+            test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-framework-parent</artifactId>
+    <packaging>pom</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：技术组件聚合层 / Responsibility boundary: technical component aggregator
+        本 POM 是父/聚合角色，仅供子模块继承与聚合，不作为运行时依赖引入
+        This POM is a parent/aggregator; intended for inheritance and aggregation only, never as a runtime dependency
+        组件分三类 / Three component categories:
+        1）框架组件：对第三方库的拓展（Web、数据访问、消息、存储等） / Framework components: extensions to third-party libraries
+        2）业务支撑组件：服务于业务场景的横切能力（多租户、数据范围、位置信息等），
+           artifactId 通常含 biz 或业务语义词
+           Business-support components: business-scenario cross-cutting capabilities
+           (multi-tenant, data scope, location, etc.); artifactId typically contains biz or a business-semantic word
+        3）测试支撑组件：realm-test，仅以 test 作用域被其他模块依赖
+           Test-support component: realm-test, depended on with test scope only
+    -->
+    <description>
+        技术组件聚合层，每个子模块代表一个组件。
+        本 POM 为父/聚合角色，仅供子模块继承与聚合，不作为运行时依赖引入。
+        组件分三类：
+        1）框架组件：对第三方库的拓展（Web、数据访问、消息、存储等）；
+        2）业务支撑组件：服务于业务场景的横切能力（多租户、数据范围、位置信息等），
+        artifactId 通常含 biz 或业务语义词；
+        3）测试支撑组件：realm-test，仅以 test 作用域被其他模块依赖。
+        Technical component aggregator. Each submodule is one component.
+        This POM is a parent/aggregator; for inheritance and aggregation only, never as a runtime dependency.
+        Three categories: framework components (third-party extensions),
+        business-support components (multi-tenant, data scope, location, etc.;
+        artifactId typically contains biz or a business-semantic word),
+        and the test-support component (realm-test, depended on with test scope only).
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!--
+        子模块定义 / Submodule definitions
+        按职责分层排列：基础 → Web → 安全 → 数据访问 → 消息调度 → 稳定性 → 文件与存储 → 配置与环境 → 业务支撑
+        Ordered by layer: foundation → web → security → data access → messaging & scheduling →
+        stability → file & storage → config & runtime environment → business support
+        注意：Maven 的构建顺序由模块间依赖决定，不由 <modules> 顺序决定；
+        此处顺序仅用于阅读，反映逻辑分层。
+        Note: Maven's build order is determined by inter-module dependencies, not by <modules> order;
+        the order here is for readability only and reflects logical layering.
+    -->
+    <modules>
+
+        <!-- 基础 / Foundation -->
+
+        <!-- 纯技术契约：PageResult、ApiResponse、BusinessException、通用枚举 / Pure technical contracts -->
+        <module>realm-core</module>
+
+        <!-- 通用工具类：日期、字符串、ID、JSON 辅助等 / General utilities -->
+        <module>realm-utils</module>
+
+        <!-- 测试支撑：基类与 Mock 环境，仅 test 作用域使用；逻辑上属于基础层 / Test support: base classes & mock environment, test scope only; logically foundational -->
+        <module>realm-test</module>
+
+        <!-- Web / Web -->
+
+        <!-- HTTP 入站横切：异常映射、追踪、日志、版本、分页、CORS / HTTP inbound cross-cutting -->
+        <module>realm-web-spring-boot-starter</module>
+
+        <!-- WebSocket：连接治理与跨节点中继 / WebSocket: connection governance & cross-node relay -->
+        <module>realm-websocket-spring-boot-starter</module>
+
+        <!-- OpenFeign 客户端治理：超时/重试基线、上下文传播、指标埋点 / OpenFeign client governance -->
+        <module>realm-openfeign-spring-boot-starter</module>
+
+        <!-- 安全 / Security -->
+
+        <!-- 授权决策（“谁可以做什么”）：权限模型、授权拦截、拒绝响应统一格式化 / Authorization decisions -->
+        <module>realm-authorization-spring-boot-starter</module>
+
+        <!-- 操作审计（“谁在何时做了什么”）：@AuditLog 切面、异步事件、SPI 持久化 / Operational audit logging -->
+        <module>realm-audit-logging-spring-boot-starter</module>
+
+        <!-- 数据访问 / Data access -->
+
+        <!-- 数据访问基础：连接池、多数据源、事务管理（ORM 无关） / Data access foundation (ORM-agnostic) -->
+        <module>realm-data-access-spring-boot-starter</module>
+
+        <!-- MyBatis-Plus 适配：SqlSessionFactory、拦截器、Mapper 扫描 / MyBatis-Plus adapter -->
+        <module>realm-mybatis-plus-spring-boot-starter</module>
+
+        <!-- Spring Data JPA 适配：EntityManagerFactory、Repository 扫描、JpaTransactionManager / Spring Data JPA adapter -->
+        <module>realm-data-jpa-spring-boot-starter</module>
+
+        <!-- Redis 数据访问抽象：RedisTemplate 序列化、RedisCacheManager、Redisson 连接工厂 / Redis data access abstraction -->
+        <module>realm-data-redis-spring-boot-starter</module>
+
+        <!-- 分布式事务：Seata 客户端接入、多数据源协同、统一异常转换 / Distributed transaction: Seata client integration -->
+        <module>realm-distributed-transaction-spring-boot-starter</module>
+
+        <!-- 消息与调度 / Messaging & scheduling -->
+
+        <!-- 传输中立的消息抽象与 Binder SPI / Transport-neutral messaging abstraction & Binder SPI -->
+        <module>realm-messaging-spring-boot-starter</module>
+
+        <!-- 调度基础设施的抽象与治理：调度引擎 SPI、执行器生命周期、可观测性 / Scheduling infrastructure abstraction & governance -->
+        <module>realm-scheduling-spring-boot-starter</module>
+
+        <!-- 稳定性 / Stability -->
+
+        <!-- 可观测性（metrics/tracing/logging）+ 保护（限流/熔断/幂等/分布式锁） / Observability + protection -->
+        <module>realm-stability-spring-boot-starter</module>
+
+        <!-- 文件与存储 / File & storage -->
+
+        <!-- 文件数据交换抽象层：注解模型、流式默认值、导入校验、异步任务 / File data exchange abstraction -->
+        <module>realm-file-spring-boot-starter</module>
+
+        <!-- 对象存储统一抽象 + S3 协议实现 / Unified object storage abstraction + S3 protocol implementation -->
+        <module>realm-object-storage-spring-boot-starter</module>
+
+        <!-- 配置与运行环境 / Config & runtime environment -->
+
+        <!-- 配置中心客户端接入：SPI、解密钩子、变更事件 / Config-center client integration -->
+        <module>realm-config-client-spring-boot-starter</module>
+
+        <!-- 特性环境流量染色与标签路由 / Feature-environment traffic tagging & label routing -->
+        <module>realm-feature-env-spring-boot-starter</module>
+
+        <!-- 业务支撑 / Business support -->
+
+        <!-- 多租户底座：租户上下文生命周期、解析 SPI、隔离策略注入点 / Multi-tenancy foundation -->
+        <module>realm-multitenancy-spring-boot-starter</module>
+
+        <!-- 数据范围（行级过滤）：解析用户上下文并织入 MyBatis 查询 / Data scope (row-level filtering) -->
+        <module>realm-biz-data-scope-spring-boot-starter</module>
+
+        <!-- 位置信息：IP 定位 + 城市数据查询 / Location information: IP geolocation + city data lookup -->
+        <module>realm-biz-location-spring-boot-starter</module>
+
+    </modules>
+
+</project>

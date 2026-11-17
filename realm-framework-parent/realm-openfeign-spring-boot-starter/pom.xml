@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-openfeign-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：OpenFeign 客户端治理层
+        Responsibility boundary: OpenFeign client governance layer
+        仅包含：容错安全基线（超时/幂等性感知重试）、realm 上下文自动传播（租户/追踪/认证）、
+                可观测性埋点、日志脱敏
+        Only contains: fault-tolerance safety baseline (timeout / idempotency-aware retry),
+                automatic realm context propagation (tenant/trace/auth), observability
+                instrumentation, log masking
+        不包含：声明式客户端本身、负载均衡、服务发现（由官方 spring-cloud-starter-openfeign 提供）
+        Does not contain: declarative client itself, load balancing, service discovery
+        (provided by official spring-cloud-starter-openfeign)
+        不强制绑定熔断器实现；与 realm-stability-spring-boot-starter 或应用选择的熔断器通过 SPI 集成
+        Does not force a circuit breaker implementation; integrates via SPI with
+        realm-stability-spring-boot-starter or an app-chosen circuit breaker
+        依据：RFC 9110 幂等性语义（仅幂等方法可安全自动重试）；
+        OWASP API Security（客户端安全与日志脱敏）
+        Basis: RFC 9110 idempotency semantics (only idempotent methods are safe to auto-retry);
+        OWASP API Security (client-side security & log masking)
+    -->
+    <description>
+        OpenFeign 客户端治理层：统一的超时/幂等性感知重试安全基线、realm 上下文（租户/追踪/认证）自动传播、
+        可观测性埋点、日志脱敏。不重复官方 starter 的声明式客户端、负载均衡与服务发现能力。
+        OpenFeign client governance: unified timeout / idempotency-aware retry safety baseline,
+        automatic realm context (tenant/trace/auth) propagation, observability instrumentation, log masking.
+        Does not duplicate the official starter's declarative client, load balancing, or service discovery.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、SubjectContext 等中立接口；Feign 调用失败、上下文缺失时
+            抛出 BusinessException（携带错误码），由 realm-web 的
+            GlobalExceptionHandler 统一转换，本模块不处理 HTTP 响应
+            Provides BusinessException, SubjectContext and other neutral interfaces; Feign
+            call failures and missing context throw BusinessException (with an error code),
+            which realm-web's GlobalExceptionHandler converts; this module does not handle
+            HTTP responses
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合、JSON 辅助等工具；请求头归一化、日志脱敏字段匹配需要
+            Provides string, collection, JSON helper utilities; needed for header
+            normalization and masked-field matching
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            核心：Spring Cloud OpenFeign 官方 Starter
+            Core: official Spring Cloud OpenFeign starter
+            提供声明式客户端、Feign.Builder 定制点、RequestInterceptor 扩展、
+            ErrorDecoder、Encoder/Decoder
+            Provides declarative clients, Feign.Builder customization, RequestInterceptor
+            extension, ErrorDecoder, Encoder/Decoder
+            compile：本模块的治理能力全部建立在其扩展点之上，不可 optional
+            compile: all governance capabilities build on its extension points;
+            cannot be optional
+            传递引入 spring-web、spring-cloud-commons、feign-core 等
+            Transitively brings spring-web, spring-cloud-commons, feign-core, etc.
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+
+        <!--
+            自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Auto-configuration foundation
+            提供条件装配、配置属性绑定；本模块的 Feign 定制 Bean 依赖这些注解
+            Provides conditional assembly and configuration property binding; this module's
+            Feign customization beans rely on these annotations
+            compile：自动配置类直接使用；与 realm-data-access、realm-data-jpa、
+            realm-data-redis、realm-distributed-transaction、realm-feature-env、
+            realm-file、realm-messaging、realm-multitenancy、realm-mybatis-plus、
+            realm-object-storage 等模块风格一致
+            compile: auto-configuration classes use it directly; consistent with
+            realm-data-access, realm-data-jpa, realm-data-redis,
+            realm-distributed-transaction, realm-feature-env, realm-file, realm-messaging,
+            realm-multitenancy, realm-mybatis-plus, and realm-object-storage
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            OpenTelemetry API：追踪上下文传播
+            OpenTelemetry API: trace context propagation
+            RequestInterceptor 从当前 OTel Context 中提取 W3C traceparent / tracestate，
+            注入出站请求头
+            RequestInterceptor extracts W3C traceparent / tracestate from the current OTel
+            Context and injects them into outbound headers
+            compile：API 需在编译期可见；运行时由 sdk 提供实现
+            compile: API visible at compile time; implementation provided by sdk at runtime
+            注意：compile 作用域意味着 API 会传递给所有下游应用，
+            @ConditionalOnClass(OpenTelemetry.class) 总是通过；
+            SDK 缺席时 GlobalOpenTelemetry.get() 返回 no-op，trace 传播静默失效
+            （traceId 为空），而不是“配置类不加载”
+            Note: compile scope means the API propagates to all downstream apps;
+            @ConditionalOnClass(OpenTelemetry.class) always passes; when the SDK is absent,
+            GlobalOpenTelemetry.get() returns a no-op and trace propagation silently fails
+            (empty traceId), rather than "the configuration class not loading"
+            版本由 realm-dependencies 中导入的 opentelemetry-bom 统一管理
+            Version managed by the opentelemetry-bom imported in realm-dependencies
+        -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+        </dependency>
+
+        <!--
+            多租户上下文（optional）：租户标识自动传播
+            Multi-tenant context (optional): automatic tenant identifier propagation
+            从 realm-multitenancy-spring-boot-starter 的 TenantContext 读取当前租户标识，
+            注入出站请求头
+            Reads the current tenant identifier from realm-multitenancy-spring-boot-starter's
+            TenantContext and injects it into outbound headers
+            optional：不使用多租户的应用不应被迫引入 multitenancy；
+            相关 RequestInterceptor 通过 @ConditionalOnClass 条件化
+            optional: apps not using multi-tenancy should not be forced to pull it in;
+            the related RequestInterceptor is gated by @ConditionalOnClass
+            注意：optional 依赖在编译期可见、运行时不传递；条件化必须放在
+            直接 import TenantContext 的配置类上，且该类不能被无条件加载的
+            配置类直接引用（否则应用没有 multitenancy 时会抛 NoClassDefFoundError）
+            Note: optional dependencies are visible at compile time but not propagated
+            at runtime; the condition must be placed on the configuration class that
+            directly imports TenantContext, and that class must not be directly referenced
+            by an unconditionally loaded configuration class (otherwise the app without
+            multitenancy throws NoClassDefFoundError)
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-multitenancy-spring-boot-starter</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            Spring Security 核心（provided）：认证令牌传播
+            Spring Security core (provided): authentication token propagation
+            从 SecurityContextHolder 获取当前认证主体的令牌，注入 Authorization 头；
+            仅 import 类型，不定义 SecurityFilterChain
+            Reads the current authenticated principal's token from SecurityContextHolder and
+            injects it into the Authorization header; only imports types, defines no
+            SecurityFilterChain
+            provided：由安全层提供；本模块不强制安全依赖，相关 RequestInterceptor
+            通过 @ConditionalOnClass 条件化
+            provided: supplied by the security layer; this module does not force a security
+            dependency; related RequestInterceptor gated by @ConditionalOnClass
+            注意：与 realm-multitenancy 相同的条件化要求——@ConditionalOnClass
+            必须放在直接 import SecurityContextHolder 的配置类上
+            Note: same conditional requirement as realm-multitenancy — @ConditionalOnClass
+            must be placed on the configuration class that directly imports
+            SecurityContextHolder
+        -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            Micrometer（optional）：出站调用可观测性
+            Micrometer (optional): outbound call observability
+            为每个 Feign 客户端的调用记录 Timer（耗时）、Counter（成功/失败），
+            标签包含 client、method、status
+            Records Timer (latency) and Counter (success/failure) per Feign client call,
+            with tags client/method/status
+            optional：MeterRegistry 缺席时降级为 no-op；
+            与 realm-stability 的可观测性体系共享同一 MeterRegistry
+            optional: degrades to no-op when MeterRegistry is absent; shares the same
+            MeterRegistry with realm-stability's observability system
+        -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            Jackson（optional）：请求/响应日志的结构化输出
+            Jackson (optional): structured output for request/response logs
+            用于在开启日志时序列化请求/响应体；默认关闭完整 body 日志，
+            仅在显式开启时使用
+            Used to serialize request/response bodies when logging is enabled; full-body
+            logging is off by default and only used when explicitly enabled
+            optional：应用已有 Jackson 则直接使用；可替换为其他序列化器
+            optional: used directly if Jackson is already present; replaceable with
+            another serializer
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            自动配置元数据生成器（optional）：生成 spring-autoconfigure-metadata.properties
+            Autoconfigure metadata processor (optional)
+            启动时提前过滤不匹配的自动配置，降低启动开销
+            Pre-filters non-matching auto-configurations at startup to reduce boot cost
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；
+            用于验证 RequestInterceptor、幂等性重试策略、指标埋点
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito; used to verify
+            RequestInterceptor, idempotency-aware retry policy, and metrics instrumentation
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产 / test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

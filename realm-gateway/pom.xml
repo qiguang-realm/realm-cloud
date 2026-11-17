@@ -1,112 +1,336 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <!-- POM 模型版本（必需） / POM model version (required) -->
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <!--
+        父 POM 继承：realm（顶层）/ Parent POM: realm (top-level)
+        注意：不是 realm-framework-parent——gateway 是独立部署的应用，
+        与 framework 的 starter 并列，不参与 framework 的聚合。
+        Note: not realm-framework-parent — the gateway is a standalone deployable
+        application, parallel to the framework starters, not part of framework aggregation.
+    -->
     <parent>
         <groupId>cn.realm.cloud</groupId>
         <artifactId>realm</artifactId>
         <version>${revision}</version>
     </parent>
 
-    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <!-- 项目标识 / Project coordinates -->
     <artifactId>realm-gateway</artifactId>
     <packaging>jar</packaging>
 
-    <!-- 项目信息 / Project information -->
     <name>${project.artifactId}</name>
-    <description>
-        分布式 API 网关服务，基于 Spring Cloud Gateway 实现路由转发、流量控制和安全防护。
-        Distributed API gateway service built on Spring Cloud Gateway, providing
-        routing, traffic control, and security protection.
-    </description>
-    <!-- 请替换为实际项目地址 / Replace with actual project URL -->
-    <url>https://github.com/</url>
 
-    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <!--
+        职责边界：API 网关（边缘策略执行点）/ Responsibility boundary: API gateway (edge policy enforcement point)
+        仅包含：动态路由、JWT 验证、粗粒度授权、流量治理、可观测性入口、可信头部传播
+        Only contains: dynamic routing, JWT validation, coarse-grained authorization,
+                traffic governance, observability entry, trusted header propagation
+        不包含：业务逻辑与数据聚合、细粒度/对象级授权、WAF 或深度包检测、服务发现实现
+        Does not contain: business logic & data aggregation, fine-grained/object-level
+                authorization, WAF or deep packet inspection, service discovery implementation
+        技术栈：Spring Cloud Gateway（WebFlux 响应式）——与 realm-web / realm-authorization
+        的 Servlet 栈不兼容，本 POM 不引入任何 Servlet 栈的 realm starter
+        Tech stack: Spring Cloud Gateway (WebFlux reactive) — incompatible with the Servlet
+        stack of realm-web / realm-authorization; this POM does not bring in any
+        Servlet-based realm starter
+        依据：Kubernetes Gateway API 的角色模型（基础设施提供商 / 集群操作员 / 应用开发者）；
+        Spring Cloud 2025.0 将网关 Server 明确为 WebFlux 优先
+        Basis: Kubernetes Gateway API role model (infrastructure provider / cluster operator /
+        application developer); Spring Cloud 2025.0 explicitly makes WebFlux the primary
+        gateway server stack
+    -->
+    <description>
+        API 网关：动态路由、JWT 验证、粗粒度授权、流量治理、可观测性入口、可信头部传播。
+        不包含业务逻辑、细粒度授权、WAF、服务发现实现。
+        基于 Spring Cloud Gateway（WebFlux），不与 Servlet 栈的 realm starter 混用。
+        API gateway: dynamic routing, JWT validation, coarse-grained authorization,
+        traffic governance, observability entry, trusted header propagation.
+        No business logic, fine-grained authorization, WAF, or service discovery implementation.
+        Built on Spring Cloud Gateway (WebFlux); no mixing with Servlet-based realm starters.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由 realm-dependencies BOM 统一管控） / Dependencies (all versions managed by realm-dependencies BOM) -->
     <dependencies>
 
-        <!-- 业务模块依赖 / Business module dependencies -->
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            PageResult、ApiResponse、BusinessException、通用枚举——与栈无关，可在 WebFlux 中复用
+            PageResult, ApiResponse, BusinessException, common enums — stack-agnostic,
+            reusable in WebFlux
+            compile：契约在编译期与运行期都需要
+            compile: contracts are needed at compile time and runtime
+        -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-module-system-api</artifactId>
-            <version>${revision}</version>
-            <exclusions>
-                <!-- 排除冲突的 OpenAPI 依赖 / Exclude conflicting OpenAPI dependencies -->
-                <exclusion>
-                    <groupId>org.springdoc</groupId>
-                    <artifactId>springdoc-openapi-webmvc-core</artifactId>
-                </exclusion>
-            </exclusions>
+            <artifactId>realm-core</artifactId>
         </dependency>
 
-        <!-- 网关核心组件 / Gateway core components -->
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            字符串、集合、ID、JSON 辅助——与栈无关
+            String, collection, ID, JSON helpers — stack-agnostic
+            compile：工具方法在编译期与运行期都需要
+            compile: utilities are needed at compile time and runtime
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            配置中心客户端：realm-config-client-spring-boot-starter
+            Config-center client: realm-config-client-spring-boot-starter
+            引导层面的能力，基于 spring-cloud-context 的 @RefreshScope / RefreshEvent，
+            与 Web/Servlet 栈无关，可在 WebFlux 网关中复用
+            Bootstrap-level capability based on spring-cloud-context's @RefreshScope /
+            RefreshEvent; stack-agnostic, reusable in a WebFlux gateway
+            compile：路由规则需要从配置中心动态刷新
+            compile: routing rules need dynamic refresh from the config center
+            注意：应用需引入 Nacos / Apollo / Consul 客户端之一（optional），
+            本 POM 不强制绑定具体配置中心
+            Note: the app must bring in one of Nacos / Apollo / Consul clients (optional);
+            this POM does not force a specific config center
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-config-client-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            核心：Spring Cloud Gateway（WebFlux）
+            Core: Spring Cloud Gateway (WebFlux)
+            提供 RouteLocator、GlobalFilter、GatewayFilter、Predicate 等核心抽象；
+            网关的动态路由、过滤器链建立在其上
+            Provides RouteLocator, GlobalFilter, GatewayFilter, Predicate etc.; the gateway's
+            dynamic routing and filter chain build on it
+            compile：网关的核心运行时依赖，不可 optional
+            compile: core runtime dependency of the gateway; cannot be optional
+            artifactId 说明：Spring Cloud 2025.0 起，网关 Server 的 artifactId 为
+            spring-cloud-starter-gateway-server-webflux；旧版为
+            spring-cloud-starter-gateway（仍可用，但新项目建议用新坐标）
+            ArtifactId note: since Spring Cloud 2025.0, the gateway server artifactId is
+            spring-cloud-starter-gateway-server-webflux; the older
+            spring-cloud-starter-gateway still works, but new projects should prefer the
+            new coordinate
+        -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
         </dependency>
 
-        <!-- 服务治理：RPC 负载均衡 / Service governance: load balancing -->
+        <!--
+            客户端负载均衡：Spring Cloud LoadBalancer
+            Client-side load balancing: Spring Cloud LoadBalancer
+            网关转发时通过 lb://service-name 走客户端负载均衡；
+            与 realm-feature-env 的 HintBasedServiceInstanceListSupplier 协同实现标签路由
+            The gateway routes via lb://service-name using client-side load balancing;
+            cooperates with realm-feature-env's HintBasedServiceInstanceListSupplier for
+            label-based routing
+            compile：网关路由的核心依赖
+            compile: core dependency of gateway routing
+        -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-loadbalancer</artifactId>
         </dependency>
-        <!-- 服务注册发现（Nacos） / Service registry & discovery (Nacos) -->
+
+        <!--
+            服务发现：Nacos Discovery
+            Service discovery: Nacos Discovery
+            网关需要从注册中心获取后端服务实例列表
+            The gateway needs the service instance list from the registry
+            compile：网关路由的必要依赖
+            compile: required for gateway routing
+            如果团队使用 Eureka / Consul / Kubernetes Service，替换为对应的 discovery starter
+            If the team uses Eureka / Consul / Kubernetes Service, replace with the
+            corresponding discovery starter
+        -->
         <dependency>
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
         </dependency>
-        <!-- 配置中心（Nacos） / Config center (Nacos) -->
+
+        <!--
+            响应式安全：Spring Security WebFlux
+            Reactive security: Spring Security WebFlux
+            JWT 验证、粗粒度授权在 WebFlux 下通过 ServerHttpSecurity 配置；
+            与 realm-authorization 的 Servlet 版本（HttpSecurity + SecurityFilterChain）不通用
+            JWT validation and coarse-grained authorization are configured in WebFlux via
+            ServerHttpSecurity; not interchangeable with realm-authorization's Servlet
+            version (HttpSecurity + SecurityFilterChain)
+            compile：JWT 验证与粗粒度授权是网关的核心能力
+            compile: JWT validation and coarse-grained authorization are core gateway
+            capabilities
+            注意：本 POM 不引入 realm-authorization-spring-boot-starter，因为后者基于
+            Servlet 的 SecurityFilterChain；网关的 WebFlux 安全配置需在本模块内自行实现
+            Note: this POM does not bring in realm-authorization-spring-boot-starter,
+            because the latter is based on Servlet's SecurityFilterChain; the gateway's
+            WebFlux security config must be implemented within this module
+        -->
         <dependency>
-            <groupId>com.alibaba.cloud</groupId>
-            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
-        <!-- 网关辅助功能：API 文档集成（Knife4j Gateway，版本由父 POM 统一管理） / Gateway auxiliary: API documentation (Knife4j Gateway) -->
+        <!--
+            OAuth2 资源服务器（响应式）：JWT 解析
+            OAuth2 resource server (reactive): JWT parsing
+            Spring Security 6.x 的 oauth2-resource-server 同时支持 Servlet 与 WebFlux；
+            WebFlux 下通过 ServerHttpSecurity.oauth2ResourceServer() 配置
+            Spring Security 6.x's oauth2-resource-server supports both Servlet and WebFlux;
+            under WebFlux, configure via ServerHttpSecurity.oauth2ResourceServer()
+            compile：JWT 解码与验证的核心依赖
+            compile: core dependency for JWT decoding and validation
+        -->
         <dependency>
-            <groupId>com.github.xiaoymin</groupId>
-            <artifactId>knife4j-gateway-spring-boot-starter</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
         </dependency>
 
-        <!-- 监控告警 / Monitoring & alerting -->
+        <!--
+            响应式 Web：spring-boot-starter-webflux
+            Reactive web: spring-boot-starter-webflux
+            提供 WebFlux 运行时（Netty 作为默认容器）；
+            由 spring-cloud-starter-gateway-server-webflux 传递引入，
+            但按"直接使用即直接声明"原则显式声明
+            Provides the WebFlux runtime (Netty as default container); transitively brought
+            by spring-cloud-starter-gateway-server-webflux, but declared explicitly per
+            "use directly, declare directly"
+            compile：网关的运行时基础
+            compile: runtime foundation of the gateway
+            注意：本 POM 不得引入 spring-boot-starter-web（Servlet 栈），
+            否则 Spring Boot 会强制选择 Servlet 栈，WebFlux 网关静默失效
+            Note: this POM must not bring in spring-boot-starter-web (Servlet stack);
+            otherwise Spring Boot forces the Servlet stack and the WebFlux gateway silently fails
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!--
+            可观测性：Actuator + Micrometer
+            Observability: Actuator + Micrometer
+            网关作为全链路追踪的起点，需要暴露 /actuator/health、/actuator/prometheus 等端点
+            The gateway is the entry point of full-chain tracing and needs
+            /actuator/health, /actuator/prometheus etc.
+            compile：网关的运维基础
+            compile: operational foundation of the gateway
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!--
+            网关不引入 realm-web-spring-boot-starter：
+            The gateway does not bring in realm-web-spring-boot-starter:
+            realm-web 基于 spring-boot-starter-web（Servlet 栈），与网关的 WebFlux 栈冲突；
+            realm-web 的 RFC 9457 异常映射、分页绑定、CORS 等能力在网关中不适用
+            （网关的路由层不处理业务分页，CORS 由网关的全局过滤器处理）
+            realm-web is based on spring-boot-starter-web (Servlet stack), conflicting with
+            the gateway's WebFlux stack; realm-web's RFC 9457 exception mapping, pagination
+            binding, CORS etc. are not applicable in the gateway (the gateway's routing
+            layer does not handle business pagination, and CORS is handled by the gateway's
+            global filters)
+            网关不引入 realm-authorization-spring-boot-starter：
+            The gateway does not bring in realm-authorization-spring-boot-starter:
+            realm-authorization 基于 Servlet 的 SecurityFilterChain；网关的 WebFlux 安全
+            配置需在 realm-gateway 内自行实现（ServerHttpSecurity）
+            realm-authorization is based on Servlet's SecurityFilterChain; the gateway's
+            WebFlux security config must be implemented within realm-gateway
+            (ServerHttpSecurity)
+            网关不引入 realm-stability-spring-boot-starter：
+            The gateway does not bring in realm-stability-spring-boot-starter:
+            realm-stability 的限流/幂等拦截器基于 Servlet Filter；网关的限流应通过
+            GatewayFilter 或 RequestRateLimiter 实现，不依赖 realm-stability 的 Servlet 实现
+            realm-stability's rate-limit/idempotency interceptors are based on Servlet
+            Filters; the gateway's rate limiting should be implemented via GatewayFilter
+            or RequestRateLimiter, not relying on realm-stability's Servlet implementation
+        -->
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional）：生成 IDE 配置提示
+            Configuration metadata processor (optional): generates IDE configuration hints
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；
+            reactor-test 提供 StepVerifier，用于 WebFlux 的响应式流测试
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito; reactor-test
+            provides StepVerifier for reactive-stream testing of WebFlux
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产
+            test scope, not propagated to production
+        -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-spring-boot-starter-monitor</artifactId>
-        </dependency>
-
-        <!-- 工具类库：Google Guava / Utility libraries: Google Guava -->
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-        </dependency>
-
-        <!-- Caffeine 本地缓存（必需，避免因缺少本地缓存实现导致告警） / Caffeine cache (required to avoid missing local cache warnings) -->
-        <dependency>
-            <groupId>com.github.ben-manes.caffeine</groupId>
-            <artifactId>caffeine</artifactId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
         </dependency>
 
     </dependencies>
 
-    <!-- 构建配置 / Build configuration -->
     <build>
-        <!-- 设置构建的 JAR 包名 / Set the final JAR name -->
-        <finalName>${project.artifactId}</finalName>
         <plugins>
-            <!-- Spring Boot 打包插件（将应用打包为包含全部依赖的可执行 JAR） / Spring Boot Maven Plugin (repackage as executable JAR) -->
-            <!-- 版本由父 POM 的 pluginManagement 或 spring-boot-dependencies 统一管理，此处无需显式声明 -->
-            <!-- Version managed by parent POM; no explicit version needed here -->
+            <!--
+                Spring Boot 打包插件：生成可执行 fat jar
+                Spring Boot Maven plugin: produces an executable fat jar
+                版本由父 POM（realm 顶层）的 pluginManagement 统一管理
+                Version managed by the parent POM's (realm top-level) pluginManagement
+            -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <executions>
                     <execution>
                         <goals>
-                            <!-- 将依赖一同打入最终包 / Repackage with all dependencies -->
                             <goal>repackage</goal>
                         </goals>
                     </execution>

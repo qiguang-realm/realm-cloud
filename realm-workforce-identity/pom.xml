@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-workforce-identity</artifactId>
+    <packaging>pom</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：内部员工的身份与访问管理（Workforce IAM）的父模块
+        Responsibility boundary: parent module of workforce identity and access management
+        拆分为 -api（对外契约）与 -server（业务实现），因为本模块的 API 被多个其他业务模块依赖：
+        realm-customer、realm-payment、realm-audit-logging、realm-platform、realm-devtools、
+        realm-analytics 都需要查询“当前用户是谁”。
+        Split into -api (contracts) and -server (implementation) because this module's API
+        is depended on by multiple other business modules: realm-customer, realm-payment,
+        realm-audit-logging, realm-platform, realm-devtools, and realm-analytics all need
+        to resolve "who is the current user".
+        依据：DDD 的限界上下文要求跨上下文的数据共享通过显式契约，而不是共享写模型；
+        Microsoft Azure Well-Architected Framework 明确区分 Workforce tenant（员工身份）
+        与 External tenant / CIAM（客户身份）。
+        Basis: DDD requires cross-context data sharing through explicit contracts rather
+        than shared write models; Microsoft Azure Well-Architected Framework explicitly
+        separates Workforce tenant (employee identity) from External tenant / CIAM.
+        本 POM 是父/聚合角色，仅供子模块继承与聚合，不作为运行时依赖引入。
+        This POM is a parent/aggregator; intended for inheritance and aggregation only,
+        never as a runtime dependency.
+    -->
+    <description>
+        内部员工的身份与访问管理（Workforce IAM）的父模块：
+        拆分为 -api（对外契约：IdentityFacade、UserDto、RoleDto、领域事件）与
+        -server（业务实现：领域模型、应用服务、Repository、Controller）。
+        不含外部客户身份（realm-customer）；不含授权决策执行（realm-authorization 消费其数据）。
+        Parent module of workforce identity and access management (Workforce IAM):
+        split into -api (contracts: IdentityFacade, UserDto, RoleDto, domain events) and
+        -server (implementation: domain model, application services, repositories, controllers).
+        No external customer identity (realm-customer); no authorization decision enforcement
+        (realm-authorization consumes this module's data).
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 子模块定义 / Submodule definitions -->
+    <modules>
+        <!-- 对外契约：IdentityFacade、UserDto、RoleDto、领域事件 / Contracts -->
+        <module>realm-workforce-identity-api</module>
+        <!-- 业务实现：领域模型、应用服务、Repository、Controller / Implementation -->
+        <module>realm-workforce-identity-server</module>
+    </modules>
+
+</project>

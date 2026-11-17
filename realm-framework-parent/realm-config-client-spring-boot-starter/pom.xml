@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-config-client-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：配置中心客户端的 realm 统一接入层
+        Responsibility boundary: realm unified integration layer for config-center clients
+        仅包含：配置中心客户端 SPI、@RefreshScope 行为约定、敏感配置解密钩子、
+                配置变更事件、与 realm-stability 的联动点
+        Only contains: config-center client SPI, @RefreshScope behavior contract,
+                sensitive-config decryption hook, config-change events, integration points
+                with realm-stability
+        不包含：配置中心服务端实现、配置的加密存储（由配置中心或 KMS 负责）、
+                具体配置中心产品的完整客户端（Nacos/Apollo/Consul 客户端以 optional 依赖引入）
+        Does not contain: config-center server implementation, encrypted config storage
+                (handled by config center or KMS), or full clients of specific config-center
+                products (Nacos/Apollo/Consul clients are pulled in as optional dependencies)
+        不绑定单一配置中心产品；通过 SPI + @ConditionalOnClass 条件化适配
+        Not bound to any single config-center product; adapters wired via SPI + @ConditionalOnClass
+        使用前提：仅当应用需要配置中心（Nacos / Apollo / Consul 之一）时引入；
+        不使用配置中心的应用不应引入本 starter，避免不必要的传递依赖
+        Prerequisite: only introduce this starter when the application uses a config center
+        (Nacos / Apollo / Consul); applications without a config center should not pull it in,
+        to avoid unnecessary transitive dependencies
+        依据：Spring Cloud 的 PropertySourceLocator 机制；Nacos / Apollo / Consul 的配置客户端接入模式
+        Basis: Spring Cloud's PropertySourceLocator mechanism; config-client integration
+        patterns of Nacos / Apollo / Consul
+    -->
+    <description>
+        配置中心客户端的 realm 统一接入层：配置中心客户端 SPI、@RefreshScope 行为约定、
+        敏感配置解密钩子、配置变更事件、与 realm-stability 的联动点。
+        不实现配置中心服务端，不绑定单一配置中心产品。
+        使用前提：仅当应用需要配置中心（Nacos / Apollo / Consul 之一）时引入；
+        不使用配置中心的应用不应引入本 starter，避免不必要的传递依赖。
+        Realm unified integration layer for config-center clients: config-center client SPI,
+        @RefreshScope behavior contract, sensitive-config decryption hook, config-change events,
+        and integration points with realm-stability.
+        No config-center server implementation; no binding to a single config-center product.
+        Prerequisite: only introduce this starter when the application uses a config center
+        (Nacos / Apollo / Consul); applications without a config center should not pull it in,
+        to avoid unnecessary transitive dependencies.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、通用枚举；配置拉取失败、配置格式非法时
+            抛出 BusinessException（携带错误码），由 realm-web 的
+            GlobalExceptionHandler 统一转换，本模块不处理 HTTP 响应
+            Provides BusinessException, common enums; config fetch failures and invalid
+            config formats throw BusinessException (with an error code), which realm-web's
+            GlobalExceptionHandler converts; this module does not handle HTTP responses
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合、JSON 辅助等工具；配置 key 归一化、敏感字段匹配需要
+            Provides string, collection, JSON helper utilities; needed for config key
+            normalization and sensitive-field matching
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            Spring Cloud Context（compile）：配置刷新与 @RefreshScope 基础设施
+            Spring Cloud Context (compile): config refresh & @RefreshScope infrastructure
+            提供 @RefreshScope、RefreshEvent、ContextRefresher、PropertySourceLocator 等核心类型；
+            本模块的配置变更事件与动态刷新约定建立在其上，不重新实现刷新机制
+            Provides @RefreshScope, RefreshEvent, ContextRefresher, PropertySourceLocator and
+            other core types; this module's config-change events and dynamic-refresh contract
+            build on it; the refresh mechanism is not reimplemented
+            版本由 Spring Cloud BOM 管理
+            Version managed by Spring Cloud BOM
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-context</artifactId>
+        </dependency>
+
+        <!--
+            Spring Boot 基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Spring Boot foundation: @AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            提供条件装配与配置属性绑定；本模块的自动配置类直接依赖
+            Provides conditional assembly and configuration property binding; this module's
+            auto-configuration classes depend on it directly
+            compile：自动配置类直接使用；与 realm-audit-logging、realm-data-scope、
+            realm-authorization、realm-biz-location 风格一致
+            compile: auto-configuration classes use it directly; consistent with
+            realm-audit-logging, realm-data-scope, realm-authorization, and realm-biz-location
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            可选：Nacos 配置中心客户端（optional） / Optional: Nacos config-center client
+            应用使用 Nacos 作为配置中心时引入；本模块的 NacosConfigClientAdapter
+            通过 @ConditionalOnClass 条件化接入
+            Pulled in when the app uses Nacos as the config center; this module's
+            NacosConfigClientAdapter is wired via @ConditionalOnClass
+            optional：不强制所有使用方携带 Nacos 客户端；使用 Apollo / Consul 的应用
+            不应被迫引入 Nacos
+            optional: Nacos client is not forced onto all consumers; apps using Apollo /
+            Consul should not be forced to pull it in
+            版本由 Spring Cloud Alibaba BOM 管理
+            Version managed by Spring Cloud Alibaba BOM
+        -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            可选：Apollo 配置中心客户端（optional） / Optional: Apollo config-center client
+            应用使用 Apollo 作为配置中心时引入；本模块的 ApolloConfigClientAdapter
+            通过 @ConditionalOnClass 条件化接入
+            Pulled in when the app uses Apollo as the config center; this module's
+            ApolloConfigClientAdapter is wired via @ConditionalOnClass
+            optional：不强制所有使用方携带 Apollo 客户端
+            optional: Apollo client is not forced onto all consumers
+            版本：Apollo 不在 Spring Boot / Spring Cloud / Spring Cloud Alibaba
+            任何官方 BOM 中，由 realm-dependencies 的 apollo.version 显式管理
+            Version: Apollo is not in any official Spring Boot / Spring Cloud /
+            Spring Cloud Alibaba BOM; explicitly managed by realm-dependencies' apollo.version
+        -->
+        <dependency>
+            <groupId>com.ctrip.framework.apollo</groupId>
+            <artifactId>apollo-client</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            可选：Consul 配置中心客户端（optional） / Optional: Consul config-center client
+            应用使用 Consul 作为配置中心时引入；本模块的 ConsulConfigClientAdapter
+            通过 @ConditionalOnClass 条件化接入
+            Pulled in when the app uses Consul as the config center; this module's
+            ConsulConfigClientAdapter is wired via @ConditionalOnClass
+            optional：不强制所有使用方携带 Consul 客户端
+            optional: Consul client is not forced onto all consumers
+            版本由 Spring Cloud BOM 管理
+            Version managed by Spring Cloud BOM
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-consul-config</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            Micrometer（optional）：配置拉取与刷新的可观测性
+            Micrometer (optional): observability for config fetch & refresh
+            记录配置拉取耗时（Timer）、刷新次数（Counter）、失败次数（Counter）
+            Records config-fetch latency (Timer), refresh counts (Counter), and failure counts (Counter)
+            optional：MeterRegistry 缺席时降级为 no-op；与 realm-stability 共享同一 MeterRegistry
+            optional: degrades to no-op when MeterRegistry is absent; shares the same
+            MeterRegistry with realm-stability
+        -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            自动配置元数据生成器（optional）：生成 spring-autoconfigure-metadata.properties
+            Autoconfigure metadata processor (optional): generates
+            spring-autoconfigure-metadata.properties
+            启动时提前过滤不匹配的自动配置，降低启动开销
+            Pre-filters non-matching auto-configurations at startup to reduce boot cost
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；
+            用于验证条件装配、解密钩子、变更事件
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito; used to verify
+            conditional assembly, decryption hooks, and change events
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产 / test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

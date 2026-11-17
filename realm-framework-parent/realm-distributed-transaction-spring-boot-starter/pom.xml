@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-distributed-transaction-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：分布式事务的 realm 接入层
+        Responsibility boundary: realm integration layer for distributed transactions
+        仅包含：Seata 客户端自动配置（TM/RM 装配、数据源代理协调、全局事务注解）、
+                事务模式配置外部化、与 realm-data-access 多数据源的协同、
+                事务失败时的统一异常转换
+        Only contains: Seata client auto-configuration (TM/RM assembly, datasource proxy coordination,
+                global transaction annotation), externalized transaction-mode configuration,
+                coordination with realm-data-access multi-datasource, unified exception conversion
+        不包含：TC（事务协调器）服务端实现；不替应用决定 AT/TCC/Saga 事务模式
+        Does not contain: TC server implementation; does not decide AT/TCC/Saga on behalf of the application
+        Seata 2.x 坐标与版本：使用 org.apache.seata，版本 2.5.0（与 Spring Boot 3.5.x 配套）
+        Seata 2.x coordinate and version: org.apache.seata, version 2.5.0 (aligned with Spring Boot 3.5.x)
+        多数据源代理策略：建议关闭 Seata 自动代理（seata.enable-auto-data-source-proxy=false），
+        手动为参与分布式事务的 DataSource 创建 DataSourceProxy，并确保事务管理器指向代理后实例；
+        具体策略见模块 README 或 ADR
+        Multi-datasource proxying: recommend disabling Seata auto-proxying
+        (seata.enable-auto-data-source-proxy=false), manually creating DataSourceProxy for
+        participating datasources, and pointing the transaction manager to the proxied instance;
+        see module README or ADR for details
+        依据：Seata 官方 2.0.0 坐标迁移指南；Spring Cloud Alibaba 2025.0.0.0 版本对应关系
+        Basis: Seata official 2.0.0 coordinate migration guide; Spring Cloud Alibaba 2025.0.0.0
+        version correspondence
+    -->
+    <description>
+        分布式事务的 realm 接入层：Seata 2.5.0 客户端自动配置、事务模式配置外部化、
+        与 realm-data-access 多数据源协同、统一异常转换。
+        不包含 TC 服务端，不替应用决定事务模式。
+        Realm integration layer for distributed transactions: Seata 2.5.0 client auto-configuration,
+        externalized transaction-mode configuration, coordination with realm-data-access multi-datasource,
+        unified exception conversion.
+        No TC server; does not decide transaction mode on behalf of the application.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、通用枚举；全局事务失败、回滚异常时
+            抛出 BusinessException（携带错误码），由 realm-web 的
+            GlobalExceptionHandler 统一转换，本模块不处理 HTTP 响应
+            Provides BusinessException, common enums; global transaction failures and
+            rollback errors throw BusinessException (with an error code), which realm-web's
+            GlobalExceptionHandler converts; this module does not handle HTTP responses
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合等工具；XID 归一化、事务分组名称处理需要
+            Provides string, collection utilities; needed for XID normalization
+            and transaction group name handling
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            数据访问基础：realm-data-access-spring-boot-starter
+            Data access foundation: realm-data-access-spring-boot-starter
+            提供 DataSource、连接池、多数据源路由、事务基础设施；
+            Seata AT 模式需要对 DataSource 进行代理，与多数据源路由和事务管理器装配协同
+            Provides DataSource, connection pool, multi-datasource routing, transaction infrastructure;
+            Seata AT mode requires DataSource proxying, coordinating with multi-datasource routing
+            and transaction manager assembly
+            compile：分布式事务必须建立在 realm 的数据访问基础设施之上，不可 optional
+            compile: distributed transactions must build on realm's data access infrastructure;
+            cannot be optional
+            关键协同：在多数据源场景下，Seata 自动代理可能只包装默认数据源；
+            建议关闭自动代理，手动为参与全局事务的 DataSource 创建 DataSourceProxy，
+            并确保 realm-data-access 提供的 TransactionManager 指向代理后的实例
+            Key coordination: in multi-datasource scenarios, Seata auto-proxying may only wrap
+            the default datasource; recommend disabling auto-proxying, manually creating
+            DataSourceProxy for participating datasources, and ensuring the TransactionManager
+            from realm-data-access points to the proxied instance
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-data-access-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            Seata 2.x 客户端：org.apache.seata:seata-spring-boot-starter
+            Seata 2.x client: org.apache.seata:seata-spring-boot-starter
+            官方推荐方式；内部依赖 seata-all，自动注入 TM/RM，
+            提供 GlobalTransactionScanner、数据源自动代理、全局事务注解
+            Official recommendation; internally depends on seata-all, auto-injects TM/RM,
+            provides GlobalTransactionScanner, automatic datasource proxying, and the global
+            transaction annotation
+            compile：本模块的核心运行时依赖，不可 optional
+            compile: core runtime dependency of this module; cannot be optional
+            版本：${seata.version}，由 realm-dependencies BOM 管理（设为 2.5.0）
+            Version: ${seata.version}, managed by realm-dependencies BOM (set to 2.5.0)
+            坐标说明：从 Seata 2.0.0 起，Maven 坐标已从 io.seata 变更为 org.apache.seata；
+            本模块直接使用新坐标，避免未来包名（package）二次迁移
+            Coordinate note: since Seata 2.0.0, the Maven coordinate changed from
+            io.seata to org.apache.seata; this module uses the new coordinate directly
+            to avoid a second migration of package names in the future
+        -->
+        <dependency>
+            <groupId>org.apache.seata</groupId>
+            <artifactId>seata-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Auto-configuration foundation
+            本模块包含自动配置类与配置属性类，必须显式声明；
+            与 realm-data-access、realm-data-jpa、realm-data-redis 等模块风格一致
+            This module contains auto-configuration and configuration-property classes;
+            declared explicitly for consistency with realm-data-access, realm-data-jpa,
+            realm-data-redis, and other modules
+            compile：自动配置类直接使用 / compile: auto-configuration classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            Micrometer（optional）：分布式事务的可观测性
+            Micrometer (optional): observability for distributed transactions
+            记录全局事务的耗时（Timer）、提交/回滚计数（Counter），
+            标签包含事务分组、事务模式
+            Records global transaction latency (Timer) and commit/rollback counts (Counter),
+            tagged with transaction group and mode
+            optional：MeterRegistry 缺席时降级为 no-op；与 realm-stability 共享同一 MeterRegistry
+            optional: degrades to no-op when MeterRegistry is absent; shares the same
+            MeterRegistry with realm-stability
+        -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            自动配置元数据生成器（optional）：生成 spring-autoconfigure-metadata.properties
+            Autoconfigure metadata processor (optional)
+            启动时提前过滤不匹配的自动配置，降低启动开销
+            Pre-filters non-matching auto-configurations at startup to reduce boot cost
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；
+            用于验证条件装配、异常转换、与多数据源的协同
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito;
+            used to verify conditional assembly, exception conversion, and coordination
+            with multi-datasource
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产 / test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+                Seata 版本治理兜底：禁止 io.seata 坐标或 2.5.0 之外的 Seata 客户端版本
+                出现在依赖树中，防止传递依赖引入不兼容组件
+                Seata version governance safety net: ban io.seata coordinates or Seata client
+                versions other than 2.5.0 from the dependency tree, preventing incompatible
+                components from being introduced transitively
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>ban-incompatible-seata</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <excludes>
+                                        <exclude>io.seata:*</exclude>
+                                        <exclude>org.apache.seata:*:*:*:*:2.5.0</exclude>
+                                    </excludes>
+                                    <message>
+                                        仅允许 org.apache.seata 坐标下的 Seata 2.5.0；
+                                        升级时同步调整 BOM 的 seata.version 与此规则
+                                        Only org.apache.seata coordinate with Seata 2.5.0 is allowed;
+                                        adjust realm-dependencies seata.version and this rule together
+                                        when upgrading
+                                    </message>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

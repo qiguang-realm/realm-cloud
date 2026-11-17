@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <!-- POM 模型版本（必需） / POM model version (required) -->
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理；artifactId 必须是父 POM 的 artifactId，即 realm） / Parent POM (version ${revision} managed by parent; artifactId must be the parent's artifactId, i.e. realm) -->
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
     <parent>
         <groupId>cn.realm.cloud</groupId>
         <artifactId>realm</artifactId>
@@ -17,220 +18,269 @@
     <artifactId>realm-server</artifactId>
     <packaging>jar</packaging>
 
-    <!-- 项目信息：后端主项目（空壳容器），通过组合不同业务模块构建完整应用，对外提供 RESTful API / Project info: main backend server (shell container) assembling business modules and exposing RESTful APIs -->
     <name>${project.artifactId}</name>
-    <description>
-        后端 Server 的主项目，通过引入所需 realm-module-xxx 模块，
-        提供 RESTful API 给前端项目（如 realm-ui-admin、realm-ui-user 等）。
-        本质上，它是一个空壳（容器），通过组合不同的业务模块来构建完整的应用。
 
-        The main backend server project. It provides RESTful APIs to frontend projects
-        (e.g., realm-ui-admin, realm-ui-user) by including the required realm-module-xxx
-        dependencies. Essentially, it is a shell (container) that assembles business modules.
+    <!--
+        职责边界：模块化单体的唯一可运行入口 / Responsibility boundary: the sole runnable entry of the modular monolith
+        组装所有业务模块与基础 starter，提供 main() 启动类，触发 Spring Modulith 的
+        ApplicationModules.of(Application.class).verify() 边界验证。
+        Assembles all business modules and foundation starters, provides the main() entry,
+        and triggers Spring Modulith's ApplicationModules.of(Application.class).verify()
+        boundary validation.
+
+        部署定位：当前阶段的生产部署单元（模块化单体）；与 realm-gateway 配合，
+        构成完整的生产部署拓扑。当某个业务模块满足提取阈值、被拆分为独立 -server
+        应用后，本模块继续承载剩余未提取的模块，不会消失。
+        Deployment: the production deployment unit in the current stage (modular monolith);
+        together with realm-gateway, it forms the complete production topology. When a
+        business module meets the extraction threshold and is split into an independent
+        -server application, this module continues to host the remaining modules and
+        does not disappear.
+
+        本模块不包含业务逻辑；业务逻辑全部在业务模块中。它的唯一职责是“组装 + 启动 +
+        边界验证”。
+        This module contains no business logic; all business logic lives in business modules.
+        Its sole responsibility is "assemble + start + boundary verification".
+    -->
+    <description>
+        模块化单体的唯一可运行入口：组装所有业务模块与基础 starter，触发 Spring Modulith 边界验证。
+        不包含业务逻辑；当前阶段即生产部署单元，部分模块提取后承载剩余模块。
+        The sole runnable entry of the modular monolith: assembles all business modules and
+        foundation starters, triggers Spring Modulith boundary validation.
+        No business logic; the production deployment unit in the current stage, and the host
+        of remaining modules after partial extraction.
     </description>
-    <!-- 请替换为实际项目地址 / Replace with actual URL -->
-    <url>https://mvnrepository.com/</url>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
 
     <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
     <dependencies>
 
-        <!-- 业务模块依赖（按需引入，默认注释以提升编译速度） / Business module dependencies (enable as needed; commented by default to speed up compilation) -->
+        <!--
+            基础 starter：HTTP 入站横切 / Foundation starter: HTTP inbound cross-cutting
+            RFC 9457 ProblemDetail、W3C Trace Context、日志脱敏、分页绑定、CORS
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-web-spring-boot-starter</artifactId>
+        </dependency>
 
-        <!-- 系统模块（核心基础模块） / System module (core foundation) -->
+        <!--
+            基础 starter：数据访问基础设施 / Foundation starter: data access infrastructure
+            连接池、多数据源路由、事务管理器基础
+        -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-module-system-server</artifactId>
-            <version>${revision}</version>
+            <artifactId>realm-data-access-spring-boot-starter</artifactId>
         </dependency>
 
-        <!-- 基础设施模块（可选，按需启用） / Infrastructure module (optional) -->
         <!--
+            ORM 适配：MyBatis-Plus / ORM adapter: MyBatis-Plus
+            如果团队选择 JPA 而非 MyBatis-Plus，替换为 realm-data-jpa-spring-boot-starter
+        -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-module-infra-server</artifactId>
-            <version>${revision}</version>
+            <artifactId>realm-mybatis-plus-spring-boot-starter</artifactId>
         </dependency>
-        -->
 
-        <!-- 会员中心（默认注释，保证编译速度） / Member center (commented by default) -->
         <!--
+            基础 starter：Redis 数据访问抽象 / Foundation starter: Redis data access abstraction
+            RedisTemplate 序列化、RedisCacheManager、Redisson 连接工厂
+        -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-module-member-server</artifactId>
-            <version>${revision}</version>
+            <artifactId>realm-data-redis-spring-boot-starter</artifactId>
         </dependency>
-        -->
 
-        <!-- 数据报表（默认注释，保证编译速度） / Data report (commented by default) -->
         <!--
+            基础 starter：授权决策 / Foundation starter: authorization decisions
+        -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-module-report-server</artifactId>
-            <version>${revision}</version>
+            <artifactId>realm-authorization-spring-boot-starter</artifactId>
         </dependency>
-        -->
 
-        <!-- 工作流（默认注释，保证编译速度） / Workflow (commented by default) -->
         <!--
+            基础 starter：操作审计 / Foundation starter: operational audit logging
+        -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-module-bpm-server</artifactId>
-            <version>${revision}</version>
+            <artifactId>realm-audit-logging-spring-boot-starter</artifactId>
         </dependency>
-        -->
 
-        <!-- 支付服务（默认注释，保证编译速度） / Payment service (commented by default) -->
         <!--
+            基础 starter：租户上下文生命周期 / Foundation starter: tenant context lifecycle
+        -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-module-pay-server</artifactId>
-            <version>${revision}</version>
+            <artifactId>realm-multitenancy-spring-boot-starter</artifactId>
         </dependency>
-        -->
 
-        <!-- 微信公众号模块（默认注释，保证编译速度） / WeChat MP module (commented by default) -->
         <!--
+            基础 starter：传输中立的消息抽象 / Foundation starter: transport-neutral messaging abstraction
+        -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-module-mp-server</artifactId>
-            <version>${revision}</version>
+            <artifactId>realm-messaging-spring-boot-starter</artifactId>
         </dependency>
-        -->
 
-        <!-- 商城相关模块（默认注释，保证编译速度） / Mall modules (commented by default) -->
         <!--
+            基础 starter：调度基础设施抽象 / Foundation starter: scheduling infrastructure abstraction
+        -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-module-product-server</artifactId>
-            <version>${revision}</version>
+            <artifactId>realm-scheduling-spring-boot-starter</artifactId>
         </dependency>
-        -->
-        <!--
-        <dependency>
-            <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-module-promotion-server</artifactId>
-            <version>${revision}</version>
-        </dependency>
-        -->
-        <!--
-        <dependency>
-            <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-module-trade-server</artifactId>
-            <version>${revision}</version>
-        </dependency>
-        -->
-        <!--
-        <dependency>
-            <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-module-statistics-server</artifactId>
-            <version>${revision}</version>
-        </dependency>
-        -->
 
-        <!-- CRM 相关模块（默认注释，保证编译速度） / CRM modules (commented by default) -->
         <!--
+            基础 starter：文件数据交换抽象 / Foundation starter: file data exchange abstraction
+        -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-module-crm-server</artifactId>
-            <version>${revision}</version>
+            <artifactId>realm-file-spring-boot-starter</artifactId>
         </dependency>
-        -->
 
-        <!-- ERP 相关模块（默认注释，保证编译速度） / ERP modules (commented by default) -->
         <!--
+            基础 starter：对象存储统一抽象 / Foundation starter: unified object storage abstraction
+        -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-module-erp-server</artifactId>
-            <version>${revision}</version>
+            <artifactId>realm-object-storage-spring-boot-starter</artifactId>
         </dependency>
-        -->
 
-        <!-- AI 大模型相关模块（默认注释，保证编译速度） / AI module (commented by default) -->
         <!--
+            基础 starter：可观测性 + 稳定性保护 / Foundation starter: observability + stability protection
+        -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-module-ai-server</artifactId>
-            <version>${revision}</version>
+            <artifactId>realm-stability-spring-boot-starter</artifactId>
         </dependency>
-        -->
 
-        <!-- IoT 物联网相关模块（默认注释，保证编译速度） / IoT module (commented by default) -->
         <!--
+            基础 starter：配置中心客户端接入 / Foundation starter: config-center client integration
+        -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-module-iot-server</artifactId>
-            <version>${revision}</version>
+            <artifactId>realm-config-client-spring-boot-starter</artifactId>
         </dependency>
-        -->
 
-        <!-- Spring Boot 配置处理器（optional：编译时生成配置元数据） / Spring Boot configuration processor (optional: generates config metadata at compile time) -->
+        <!--
+            业务模块：核心领域 / Business modules: core domain
+            承载主要业务逻辑 / Carry the primary business logic
+        -->
+        <!-- 注意：这里依赖的是 -server 实现模块，而不是父模块 -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-workforce-identity-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-customer</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-payment</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-intelligence</artifactId>
+        </dependency>
+
+        <!--
+            业务模块：支撑子域 / Business modules: supporting subdomain
+            为业务模块提供通用能力 / Provide shared capabilities to business modules
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-platform</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-devtools</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-analytics</artifactId>
+        </dependency>
+
+        <!--
+            注册中心：Nacos Discovery / Service registry: Nacos Discovery
+            网关通过 lb://service-name 路由到本模块注册的实例
+        -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+        </dependency>
+
+        <!--
+            配置中心：Nacos Config / Config center: Nacos Config
+            与 realm-config-client-spring-boot-starter 的 SPI 对接
+        -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional）：生成 IDE 配置提示
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-configuration-processor</artifactId>
             <optional>true</optional>
         </dependency>
 
-        <!-- 服务保障相关（可选，按需启用） / Service protection (optional) -->
         <!--
-        <dependency>
-            <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-spring-boot-starter-protection</artifactId>
-        </dependency>
+            测试相关 / Testing
         -->
-
-        <!-- 注册中心（Nacos） / Service registry (Nacos) -->
         <dependency>
-            <groupId>com.alibaba.cloud</groupId>
-            <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
-        </dependency>
-
-        <!-- 配置中心（Nacos） / Config center (Nacos) -->
-        <dependency>
-            <groupId>com.alibaba.cloud</groupId>
-            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
-        </dependency>
-
-        <!-- 测试组件（test 作用域） / Test starter (test scope) -->
-        <dependency>
-            <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-spring-boot-starter-test</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
 
-        <!-- RPC 远程调用（排除 OpenFeign，以便单体启动时禁用） / RPC remote call (excludes OpenFeign to disable it in standalone mode) -->
+        <!-- 用于 ModularityTest 执行 verify() -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+        -->
         <dependency>
             <groupId>cn.realm.cloud</groupId>
-            <artifactId>realm-spring-boot-starter-rpc</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.springframework.cloud</groupId>
-                    <artifactId>spring-cloud-starter-openfeign</artifactId>
-                </exclusion>
-            </exclusions>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
         </dependency>
 
     </dependencies>
 
     <!-- 构建配置 / Build configuration -->
     <build>
+
         <!-- 设置构建的 JAR 包名 / Set the final JAR name -->
         <finalName>${project.artifactId}</finalName>
+
         <plugins>
-            <!-- Spring Boot 打包插件（将应用打包为包含全部依赖的可执行 JAR） / Spring Boot Maven Plugin (repackage as executable JAR) -->
+            <!--
+                Spring Boot 打包插件：将本模块打包为包含全部依赖的可执行 JAR
+            -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <version>${spring-boot.version}</version>
                 <executions>
                     <execution>
                         <goals>
-                            <!-- 将依赖一同打入最终包 / Repackage with all dependencies -->
                             <goal>repackage</goal>
                         </goals>
                     </execution>
                 </executions>
             </plugin>
         </plugins>
+
     </build>
 
 </project>

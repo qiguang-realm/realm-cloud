@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-intelligence</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：AI 能力编排 / Responsibility boundary: AI capability orchestration
+        仅包含：Agent 管理、智能决策、推理集成 / Only contains: agent management, intelligent decision-making, inference integration
+        不包含：模型推理本身、单一模型提供商的绑定 / Does not contain: model inference itself, or binding to a single model provider
+        本模块是模块化单体中的单 Maven 模块（库），由 realm-server 聚合启动；
+        不独立部署，不包含 spring-boot-maven-plugin 的 repackage。
+        This module is a single Maven module (library) in the modular monolith, aggregated
+        and started by realm-server; it is not deployed independently and does not include
+        spring-boot-maven-plugin's repackage.
+    -->
+    <description>
+        AI 能力编排：Agent 管理、智能决策、推理集成。
+        不实现模型推理本身，不绑定单一模型提供商。
+        AI capability orchestration: agent management, intelligent decision-making,
+        inference integration. No model inference implementation; no binding to a single
+        model provider.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、SubjectContext、通用枚举；
+            AI 能力编排中的异常与主体标识复用这些契约
+            Provides BusinessException, SubjectContext, common enums; exceptions and
+            subject identity in AI capability orchestration reuse these contracts
+            compile：契约在编译期与运行期都需要
+            compile: contracts are needed at compile and runtime
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合、JSON 辅助等工具（如用到）
+            Provides string, collection, JSON helper utilities (if used)
+            compile：工具方法在编译期与运行期都需要
+            compile: utilities are needed at compile and runtime
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            Spring Boot 基础：@Service / @Component / @Configuration / @Transactional
+            Spring Boot foundation: @Service / @Component / @Configuration / @Transactional
+            业务模块的 Bean 注册与依赖注入基础；由父 POM 的依赖管理统一版本
+            Foundation for bean registration and dependency injection in business modules;
+            version managed by the parent POM
+            compile：业务类直接使用
+            compile: business classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            Spring Modulith API：模块化边界声明
+            Spring Modulith API: modular boundary declaration
+            提供 @ApplicationModule 与 @NamedInterface 注解，用于声明模块依赖白名单。
+            Provides @ApplicationModule and @NamedInterface annotations for declaring
+            module dependency whitelists.
+            compile：package-info.java 与架构测试直接使用
+            compile: used directly by package-info.java and architecture tests
+        -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-api</artifactId>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产
+            test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

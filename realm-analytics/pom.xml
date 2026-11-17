@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-analytics</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：只读分析上下文 / Responsibility boundary: read-only analytics context
+        仅包含：报表、仪表盘、数据投影、只读聚合查询 / Only contains: reports, dashboards, data projections, read-only aggregate queries
+        不包含：写入业务数据、事务性操作、业务模块的写模型 / Does not contain: writing business data, transactional operations, or business modules' write models
+        依赖方向红线：本模块消费其他模块的数据（通过事件构建读模型，或查询只读副本），
+        但不被任何业务模块反向依赖——没有业务模块的写入路径依赖 analytics。
+        Dependency direction red line: this module consumes data from other modules (by building
+        read models from events, or querying read replicas), but is not reverse-depended on by
+        any business module — no business module's write path depends on analytics.
+        依据：DDD 的只读分析上下文（Analytics / Reporting）是一个独立的限界上下文；
+        其数据来自其他上下文的投影，而不是共享同一套写模型。
+        Basis: DDD treats the read-only Analytics / Reporting context as an independent
+        bounded context; its data comes from projections of other contexts, not from sharing
+        the same write model.
+        本模块是模块化单体中的单 Maven 模块（库），由 realm-server 聚合启动；
+        不独立部署，不包含 spring-boot-maven-plugin 的 repackage。
+        This module is a single Maven module (library) in the modular monolith, aggregated
+        and started by realm-server; it is not deployed independently and does not include
+        spring-boot-maven-plugin's repackage.
+    -->
+    <description>
+        只读分析：报表、仪表盘、数据投影。
+        不写入业务数据，不做事务性操作；不被任何业务模块反向依赖。
+        Read-only analytics: reports, dashboards, data projections.
+        No business data writes, no transactional operations; not reverse-depended on by
+        any business module.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、通用枚举；报表查询失败、投影构建异常等复用这些契约
+            Provides BusinessException, common enums; report query failures and projection
+            build errors reuse these contracts
+            compile：契约在编译期与运行期都需要
+            compile: contracts are needed at compile and runtime
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合、日期等工具；报表参数归一化、时间区间处理需要
+            Provides string, collection, date utilities; needed for report parameter
+            normalization and time range handling
+            compile：工具方法在编译期与运行期都需要
+            compile: utilities are needed at compile and runtime
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            Spring Boot 基础：@Service / @Component / @Configuration
+            Spring Boot foundation: @Service / @Component / @Configuration
+            业务模块的 Bean 注册与依赖注入基础；由父 POM 的依赖管理统一版本
+            Foundation for bean registration and dependency injection in business modules;
+            version managed by the parent POM
+            compile：业务类直接使用
+            compile: business classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            Spring Modulith API：模块化边界声明
+            Spring Modulith API: modular boundary declaration
+            提供 @ApplicationModule 与 @NamedInterface 注解，用于声明模块依赖白名单。
+            Provides @ApplicationModule and @NamedInterface annotations for declaring
+            module dependency whitelists.
+            compile：package-info.java 与架构测试直接使用
+            compile: used directly by package-info.java and architecture tests
+        -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-api</artifactId>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产
+            test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-messaging-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：传输中立的消息抽象与 Binder SPI
+        Responsibility boundary: transport-neutral messaging abstraction and Binder SPI
+        仅包含：不可变消息契约、发布/消费接口、Binder SPI、类路径自动检测与选择、
+                统一可观测性埋点、内存 Binder（单机/测试用）
+        Only contains: immutable message contract, publisher/consumer interfaces,
+                Binder SPI, classpath auto-detection and selection, unified observability
+                instrumentation, in-memory Binder (single-node/testing)
+        不包含：任何 Broker 客户端（RocketMQ / RabbitMQ / Kafka / Redis）、
+                重试/批量/压缩等经济决策、顺序/事务/死信语义
+        Does not contain: any broker client (RocketMQ / RabbitMQ / Kafka / Redis),
+                economic decisions (retry/batch/compression), ordering/transaction/dead-letter semantics
+        Broker 适配器以独立模块存在（realm-messaging-{broker}-spring-boot-starter），
+        本模块不强制传递任何 Broker 依赖
+        Broker adapters live as separate modules
+        (realm-messaging-{broker}-spring-boot-starter); this module forces no broker dependency
+        依据：Spring Cloud Stream 的 Binder SPI 设计——核心抽象与具体中间件解耦，适配器独立交付
+        Basis: Spring Cloud Stream's Binder SPI design — core abstraction decoupled from
+        concrete middleware, adapters delivered separately
+    -->
+    <description>
+        传输中立的消息抽象与 Binder SPI：不可变消息契约、发布/消费接口、类路径自动检测与选择、统一可观测性。
+        不包含任何 Broker 客户端；重试、批量、顺序、事务、死信等语义由适配器或应用显式声明。
+        Transport-neutral messaging abstraction and Binder SPI: immutable message contract,
+        publisher/consumer interfaces, classpath auto-detection and selection, unified observability.
+        No broker client; retry, batching, ordering, transactions, and dead-letter semantics
+        are declared explicitly by adapters or applications.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、通用枚举；消息发布/消费失败、Binder 选择失败时
+            抛出 BusinessException（携带错误码），由 realm-web 的
+            GlobalExceptionHandler 统一转换，本模块不处理 HTTP 响应
+            Provides BusinessException, common enums; message publish/consume failures and
+            binder selection errors throw BusinessException (with an error code), which
+            realm-web's GlobalExceptionHandler converts; this module does not handle
+            HTTP responses
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合等工具；目的地名称归一化、消息头处理需要
+            Provides string, collection utilities; needed for destination name
+            normalization and message header handling
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            Spring Messaging：传输无关的消息模型
+            Spring Messaging: transport-agnostic message model
+            提供 Message<T>、MessageHeaders、MessageHandler 等核心抽象；
+            本模块的不可变消息契约与消费接口建立在其上
+            Provides Message<T>, MessageHeaders, MessageHandler etc.; this module's
+            immutable message contract and consumer interface build on it
+            compile：消息抽象是本模块的核心，不能 optional
+            compile: messaging abstraction is this module's core, cannot be optional
+            传递引入 spring-context、spring-beans、spring-core；如果代码直接使用
+            @Async、TaskExecutor、ApplicationEventPublisher 等 spring-context 类型，
+            应显式声明 spring-context
+            Transitively brings spring-context, spring-beans, spring-core; if code
+            directly uses @Async, TaskExecutor, ApplicationEventPublisher etc.,
+            declare spring-context explicitly
+            版本由 Spring Boot BOM 管理（Spring Framework 6.2.x）
+            Version managed by Spring Boot BOM (Spring Framework 6.2.x)
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-messaging</artifactId>
+        </dependency>
+
+        <!--
+            自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Auto-configuration foundation
+            提供条件装配、配置属性绑定；本模块的 Binder 选择与内存 Binder 注册依赖它
+            Provides conditional assembly and configuration property binding; binder
+            selection and in-memory binder registration depend on it
+            compile：自动配置类直接使用；与 realm-data-access、realm-data-jpa、
+            realm-data-redis、realm-distributed-transaction、realm-feature-env、
+            realm-file 等模块风格一致
+            compile: auto-configuration classes use it directly; consistent with
+            realm-data-access, realm-data-jpa, realm-data-redis,
+            realm-distributed-transaction, realm-feature-env, and realm-file
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            Micrometer（optional）：消息发布/消费的可观测性
+            Micrometer (optional): observability for message publish/consume
+            记录发布/消费耗时（Timer）、成功/失败计数（Counter），
+            标签包含目的地、Binder 类型
+            Records publish/consume latency (Timer) and success/failure counts (Counter),
+            tagged with destination and binder type
+            optional：MeterRegistry 缺席时降级为 no-op；与 realm-stability 共享同一 MeterRegistry
+            optional: degrades to no-op when MeterRegistry is absent; shares the same
+            MeterRegistry with realm-stability
+            Note: required if MessagingMetrics (or equivalent) directly imports
+            io.micrometer.core.instrument.*
+        -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            自动配置元数据生成器（optional）：生成 spring-autoconfigure-metadata.properties
+            Autoconfigure metadata processor (optional)
+            启动时提前过滤不匹配的自动配置，降低启动开销
+            Pre-filters non-matching auto-configurations at startup to reduce boot cost
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；
+            用于验证 Binder 选择与内存 Binder 的行为
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito;
+            used to verify binder selection and in-memory binder behavior
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产 / test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

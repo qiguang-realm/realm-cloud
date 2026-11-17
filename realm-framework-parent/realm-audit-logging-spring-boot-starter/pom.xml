@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-audit-logging-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：操作审计记录（“谁在什么时间对什么做了什么”） / Responsibility boundary: operational audit logging
+        仅包含：@AuditLog 注解、AOP 切面捕获、异步事件发布、可插拔的 AuditEventRepository SPI、默认日志文件持久化
+        Only contains: @AuditLog annotation, AOP aspect capture, async event publication,
+        pluggable AuditEventRepository SPI, default log-file persistence
+        不包含：授权决策、权限判断、审计日志的查询/分析界面 / Does not contain: authorization decisions, permission checks, audit-log query/analysis UI
+        不包含：对 realm-authorization-spring-boot-starter 的编译期依赖；主体身份通过中立的 SubjectContext 获取
+        Does not contain: compile-time dependency on realm-authorization-spring-boot-starter;
+        subject identity is obtained via a neutral SubjectContext
+        依据：NIST SP 800-53 AU 族（Audit and Accountability）；OWASP Logging Cheat Sheet；ISO/IEC 27001 职责分离
+        Basis: NIST SP 800-53 AU family; OWASP Logging Cheat Sheet; ISO/IEC 27001 separation of duties
+    -->
+    <description>
+        操作审计记录：@AuditLog 注解、AOP 切面捕获、异步事件发布、可插拔的 AuditEventRepository SPI、默认日志文件持久化。
+        不做授权决策、权限判断，不依赖授权模块；主体身份通过中立的 SubjectContext 获取。
+        Operational audit logging: @AuditLog annotation, AOP aspect capture, async event publication,
+        pluggable AuditEventRepository SPI, default log-file persistence.
+        No authorization decisions, permission checks, or dependency on the authorization module;
+        subject identity is resolved via a neutral SubjectContext.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、SubjectContext 接口、通用枚举；
+            审计事件 ID 生成、结果状态枚举、操作人身份读取均复用这些契约
+            Provides BusinessException, SubjectContext interface, common enums;
+            audit event ID generation, result status enums, and operator identity resolution reuse these contracts
+            compile：契约在编译期与运行期都需要；SubjectContext 的实现由应用或安全层提供，
+            这是运行时的 SPI 问题，不需要在 POM 中通过 provided 表达
+            compile: contracts are needed at compile and runtime; the SubjectContext implementation
+            is supplied by the app or security layer, which is a runtime SPI concern,
+            not something to express via provided in the POM
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合、JSON 辅助等工具；审计事件中参数与返回值的序列化、脱敏处理需要
+            Provides string, collection, JSON helper utilities; needed for serializing and masking
+            parameters and return values in audit events
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            Spring Boot 自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConditionalOnProperty / @ConfigurationProperties
+            Spring Boot auto-configuration foundation
+            本模块包含自动配置类，必须依赖 spring-boot-autoconfigure
+            This module contains auto-configuration classes; spring-boot-autoconfigure is required
+            compile：自动配置类直接使用 / compile: auto-configuration classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            AOP 切面支持：@AuditLog 注解的拦截与上下文捕获 / AOP support: interception and context capture for @AuditLog
+            本模块不强制 Web 依赖，因此显式声明 AOP，确保方法级审计在非 Web 应用中同样可用；
+            spring-boot-starter-aop 传递引入 spring-context，@Async 与 @EnableAsync 随之可用
+            This module does not force a web dependency, so AOP is declared explicitly to ensure
+            method-level auditing works in non-web apps too; spring-boot-starter-aop transitively
+            brings spring-context, making @Async and @EnableAsync available
+            compile：切面捕获是本模块的核心机制 / compile: aspect capture is this module's core mechanism
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!--
+            SpEL 表达式：@AuditLog 注解中 operator、targetId、content 等属性的动态解析
+            SpEL: dynamic resolution of operator, targetId, content etc. in @AuditLog
+            支持从方法参数或返回值中提取审计要素，避免手写固定的字符串模板
+            Supports extracting audit elements from method parameters or return values,
+            avoiding hardcoded string templates
+            compile：注解属性的 SpEL 求值是本模块的核心能力
+            compile: SpEL evaluation of annotation attributes is a core capability
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-expression</artifactId>
+        </dependency>
+
+        <!--
+            Jackson（optional）：审计事件中复杂参数与返回值的 JSON 序列化
+            Jackson (optional): JSON serialization of complex parameters and return values in audit events
+            optional：如果应用中已有 Jackson（绝大多数 Spring Boot 应用都有），直接使用；
+            如果应用选择 Fastjson2 等其他序列化器，可替换。Jackson 缺席时，审计事件
+            通过 @ConditionalOnClass 降级为 toString 或跳过参数序列化
+            optional: used directly if Jackson is already present (most Spring Boot apps);
+            replaceable if the app chooses Fastjson2 or another serializer. When Jackson is absent,
+            audit events degrade via @ConditionalOnClass to toString or skip parameter serialization
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            Servlet API（provided）：从 HTTP 请求中提取 IP、User-Agent、URI 等审计元数据
+            Servlet API (provided): extract IP, User-Agent, URI and other audit metadata from HTTP requests
+            相关类通过 @ConditionalOnClass 条件化，非 Web 应用引入本模块时不会因此启动失败
+            Related classes gated by @ConditionalOnClass; non-web apps importing this module will not fail to start
+        -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            自动配置元数据生成器（optional）：生成 spring-autoconfigure-metadata.properties
+            Autoconfigure metadata processor (optional): generates spring-autoconfigure-metadata.properties
+            启动时提前过滤不匹配的自动配置，降低启动开销
+            Pre-filters non-matching auto-configurations at startup to reduce boot cost
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需 / Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递 / optional: pure compile-time annotation processor; not needed at runtime, not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；用于验证切面捕获、异步事件发布、SPI 持久化
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito; used to verify aspect capture,
+            async event publication, and SPI persistence
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境 / Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产 / test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

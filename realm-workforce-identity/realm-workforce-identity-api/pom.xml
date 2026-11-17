@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（Workforce IAM 父模块，版本由上层 realm 统一管理） / Parent POM (Workforce IAM parent, version managed by realm) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-workforce-identity</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-workforce-identity-api</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：Workforce IAM 的对外契约（供其他业务模块依赖）
+        Responsibility boundary: Workforce IAM contracts (for other business modules to depend on)
+        仅包含：IdentityFacade（门面接口）、UserDto、RoleDto、DepartmentDto、
+                UserRegisteredEvent、UserRoleChangedEvent 等领域事件
+        Only contains: IdentityFacade (facade interface), UserDto, RoleDto, DepartmentDto,
+                UserRegisteredEvent, UserRoleChangedEvent and other domain events
+        不包含：领域模型、应用服务、Repository、Controller、任何实现类
+        Does not contain: domain model, application services, repositories, controllers,
+                or any implementation classes
+
+        API 模块依赖原则：只依赖“契约级”依赖（realm-core、spring-context、Jackson），
+        不依赖 realm-utils、realm-web、ORM、缓存等实现级依赖——这些属于 -server，
+        下游模块依赖本模块时，不应被动获得大量实现库。
+        Dependency principle for the API module: only contract-level dependencies
+        (realm-core, spring-context, Jackson) are declared; implementation-level
+        dependencies (realm-utils, realm-web, ORM, cache) belong to -server, and
+        downstream modules depending on this module should not transitively receive
+        heavy implementation libraries.
+    -->
+    <description>
+        Workforce IAM 的对外契约：IdentityFacade、UserDto、RoleDto、DepartmentDto、领域事件。
+        其他模块只能依赖本模块，不能依赖 -server。
+        Workforce IAM contracts: IdentityFacade, UserDto, RoleDto, DepartmentDto, domain events.
+        Other modules can only depend on this module, not on -server.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            BusinessException、SubjectContext、通用枚举——IdentityFacade 的方法签名、
+            DTO 的字段类型、领域事件的属性可能引用这些契约
+            BusinessException, SubjectContext, common enums — IdentityFacade's method
+            signatures, DTO field types, and domain event attributes may reference these
+            contracts
+            compile：契约在编译期与运行期都需要
+            compile: contracts are needed at compile and runtime
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            Web 基础（provided）：URL 级授权与拒绝响应格式化
+            Web foundation (provided): URL-level authorization and response formatting
+            Spring Security 本身依赖 Web 栈（spring-security-web 传递引入 spring-web、jakarta.servlet-api），
+            本模块无法完全避免传递；provided 声明的作用是明确本模块的编译期依赖边界，
+            不额外引入 Web 栈版本约束
+            Spring Security itself depends on the web stack (spring-security-web transitively brings
+            spring-web and jakarta.servlet-api); this module cannot fully avoid the transitive
+            dependency. The provided declaration makes the compile-time dependency boundary explicit
+            and adds no extra version constraint on the web stack
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            Spring Context：@NamedInterface 与领域事件基类 / Spring Context: @NamedInterface and domain event base classes
+            如果 -api 中的领域事件使用 Spring 的 ApplicationEvent 基类，或使用 Spring Modulith
+            的 @NamedInterface 注解，需要 spring-context
+            If domain events in -api use Spring's ApplicationEvent base class or Spring
+            Modulith's @NamedInterface annotation, spring-context is required
+            compile：领域事件与 @NamedInterface 直接使用
+            compile: domain events and @NamedInterface use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+
+        <!--
+            Jackson（compile）：DTO 的序列化注解 / Jackson (compile): serialization annotations on DTOs
+            如果 UserDto、RoleDto 使用 @JsonProperty、@JsonIgnore 等序列化注解
+            （跨服务传输或 Redis 缓存时需要），显式声明
+            If UserDto, RoleDto use serialization annotations like @JsonProperty, @JsonIgnore
+            (needed for cross-service transport or Redis caching), declared explicitly
+            compile：DTO 的序列化注解直接使用
+            compile: serialization annotations on DTOs use it directly
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <!--
+            OpenAPI 注解：@Schema 用于契约类的文档描述
+            OpenAPI annotations: @Schema for contract class documentation
+            optional：仅在启用 OpenAPI 时生效，不传递到下游
+            optional: only effective when OpenAPI is enabled; not propagated downstream
+            只引入 swagger-annotations-jakarta（纯注解），不引入
+            springdoc-openapi-starter-webmvc-ui（后者会传递引入 spring-webmvc、swagger-ui 等
+            完整 Web 栈，与 realm-core “不含 Web 运行时逻辑”的定位冲突）
+            Uses only swagger-annotations-jakarta (pure annotations), not
+            springdoc-openapi-starter-webmvc-ui (the latter transitively brings
+            spring-webmvc, swagger-ui, and the full web stack, conflicting with
+            realm-core's "no web runtime logic" positioning)
+            版本由父 POM 的 swagger-annotations.version 统一管理
+            Version managed by parent POM's swagger-annotations.version
+        -->
+        <dependency>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-annotations-jakarta</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            参数校验 API：契约类上的 @NotNull 等注解
+            Bean validation API: @NotNull etc. on contract classes
+            provided：由 Jakarta Bean Validation 实现（如 Hibernate Validator）提供；
+            下游应用通过 spring-boot-starter-validation 或 web starter 获得它，
+            realm-core 不传递，避免与下游自己的校验版本冲突
+            provided: supplied by Jakarta Bean Validation implementation (e.g. Hibernate Validator);
+            downstream apps obtain it via spring-boot-starter-validation or the web starter;
+            realm-core does not propagate it, avoiding version conflicts with downstream's own validation
+        -->
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产
+            test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

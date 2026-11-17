@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-customer</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：外部客户身份与会员管理（CIAM）
+        Responsibility boundary: external customer identity and membership management (CIAM)
+        仅包含：客户资料、等级、积分、签到、地址、标签
+        Only contains: customer profiles, tiers, points, check-in, addresses, tags
+        不包含：内部员工身份（realm-workforce-identity）；不承担 CIAM 之外的业务逻辑
+        Does not contain: workforce identity (realm-workforce-identity); no business logic
+        outside CIAM
+        依据：CIAM（Customer Identity and Access Management）是与 Workforce IAM 并列的
+        身份域；Shopify、Stripe 等领先 SaaS 系统使用 Customer 指代外部付费/使用主体。
+        Microsoft Azure Well-Architected Framework 明确要求 External tenant（客户身份）
+        与 Workforce tenant（员工身份）使用不同的用户存储、策略和身份提供者。
+        Basis: CIAM is an identity domain parallel to Workforce IAM; leading SaaS systems like
+        Shopify and Stripe use Customer for external paying/using subjects. Microsoft Azure
+        Well-Architected Framework requires External tenant (customer identity) and Workforce
+        tenant (employee identity) to use different user stores, policies, and identity providers.
+        本模块是模块化单体中的单 Maven 模块（库），由 realm-server 聚合启动；
+        不独立部署，不包含 spring-boot-maven-plugin 的 repackage。
+        This module is a single Maven module (library) in the modular monolith, aggregated
+        and started by realm-server; it is not deployed independently and does not include
+        spring-boot-maven-plugin's repackage.
+    -->
+    <description>
+        外部客户身份与会员管理：客户资料、等级、积分、签到、地址、标签。
+        不含内部员工身份（realm-workforce-identity）；不承担 CIAM 之外的业务逻辑。
+        External customer identity and membership management: customer profiles, tiers,
+        points, check-in, addresses, tags. No workforce identity (realm-workforce-identity);
+        no business logic outside CIAM.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、SubjectContext、通用枚举；
+            客户注册、积分变动、签到异常时抛出 BusinessException（携带错误码），
+            由 realm-web 的 GlobalExceptionHandler 统一转换，本模块不处理 HTTP 响应
+            Provides BusinessException, SubjectContext, common enums; customer registration,
+            point changes, and check-in errors throw BusinessException (with an error code),
+            which realm-web's GlobalExceptionHandler converts; this module does not handle
+            HTTP responses
+            compile：契约在编译期与运行期都需要
+            compile: contracts are needed at compile and runtime
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合、日期、ID 等工具；手机号归一化、积分计算、签到日期处理需要
+            Provides string, collection, date, ID utilities; needed for phone number
+            normalization, point calculation, and check-in date handling
+            compile：工具方法在编译期与运行期都需要
+            compile: utilities are needed at compile and runtime
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Auto-configuration foundation
+            本模块包含自动配置类与配置属性类，必须显式声明；
+            与 realm-data-access、realm-data-jpa、realm-data-redis、
+            realm-distributed-transaction、realm-feature-env、realm-file、
+            realm-messaging、realm-multitenancy、realm-mybatis-plus、
+            realm-object-storage、realm-openfeign、realm-scheduling、
+            realm-stability、realm-web 等模块风格一致
+            This module contains auto-configuration and configuration-property classes;
+            declared explicitly for consistency with realm-data-access, realm-data-jpa,
+            realm-data-redis, realm-distributed-transaction, realm-feature-env, realm-file,
+            realm-messaging, realm-multitenancy, realm-mybatis-plus, realm-object-storage,
+            realm-openfeign, realm-scheduling, realm-stability, and realm-web
+            compile：自动配置类直接使用
+            compile: auto-configuration classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            Spring Boot 基础：@Service / @Component / @Configuration / @Transactional
+            Spring Boot foundation: @Service / @Component / @Configuration / @Transactional
+            业务模块的 Bean 注册、依赖注入与本地事务基础；由父 POM 的依赖管理统一版本
+            Foundation for bean registration, dependency injection, and local transactions
+            in business modules; version managed by the parent POM
+            compile：业务类直接使用
+            compile: business classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            持久化：realm-mybatis-plus-spring-boot-starter
+            Persistence: realm-mybatis-plus-spring-boot-starter
+            member_user、member_tier、member_point_transaction、
+            member_experience_transaction、member_check_in_rule、
+            member_check_in_transaction、member_address、member_group、
+            member_tag、member_user_tag、member_setting、member_tier_history 的持久化
+            Persistence of member_user, member_tier, member_point_transaction,
+            member_experience_transaction, member_check_in_rule,
+            member_check_in_transaction, member_address, member_group,
+            member_tag, member_user_tag, member_setting, member_tier_history
+            compile：本模块的核心运行时依赖（二选一；如果团队选 JPA，
+            替换为 realm-data-jpa-spring-boot-starter）
+            compile: core runtime dependency of this module (pick one; if the team chooses
+            JPA, replace with realm-data-jpa-spring-boot-starter)
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-mybatis-plus-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            Web 层：realm-web-spring-boot-starter
+            Web layer: realm-web-spring-boot-starter
+            C 端（App/小程序/H5）的 REST API；与 realm-workforce-identity 的管理后台
+            API 分属不同入口
+            C-side (App/MiniApp/H5) REST APIs; separate from realm-workforce-identity's
+            admin backend APIs
+            compile：Controller 直接使用
+            compile: controllers use it directly
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-web-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            消息发送：realm-messaging-spring-boot-starter
+            Messaging: realm-messaging-spring-boot-starter
+            手机号/邮箱验证码的发送；通过 realm-messaging 的 Binder SPI 屏蔽具体渠道
+            （短信、邮件由 Broker 适配器承载）
+            Sending phone/email verification codes; concrete channels (SMS, email) are
+            carried by broker adapters via realm-messaging's Binder SPI
+            compile：验证码发送是客户注册与登录的核心能力
+            compile: verification code sending is a core capability for customer
+            registration and login
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-messaging-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            验证码：captcha-spring-boot-starter
+            Captcha: captcha-spring-boot-starter
+            图形验证码与滑动验证码；用于注册、登录、找回密码等场景的防机器人
+            Image captcha and slider captcha; used for anti-bot in registration, login,
+            password recovery, etc.
+            compile：验证码生成与校验是 C 端安全的核心能力
+            compile: captcha generation and validation are core C-side security capabilities
+            版本由 realm-dependencies 的 anji-plus-captcha.version 管理
+            Version managed by realm-dependencies' anji-plus-captcha.version
+        -->
+        <dependency>
+            <groupId>com.anji-plus</groupId>
+            <artifactId>captcha-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            租户上下文：realm-multitenancy-spring-boot-starter
+            Tenant context: realm-multitenancy-spring-boot-starter
+            客户按租户隔离（member_user 的 tenant_id）
+            Customers are isolated by tenant (tenant_id in member_user)
+            compile：租户上下文直接使用
+            compile: tenant context is used directly
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-multitenancy-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            缓存：realm-data-redis-spring-boot-starter
+            Cache: realm-data-redis-spring-boot-starter
+            验证码缓存、会员等级缓存、积分余额缓存、签到状态缓存
+            Caching verification codes, membership tiers, point balances, and check-in states
+            compile：缓存直接使用
+            compile: cache is used directly
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-data-redis-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            位置信息（可选）：realm-biz-location-spring-boot-starter
+            Location information (optional): realm-biz-location-spring-boot-starter
+            客户注册时的 IP 归属地解析；用于注册来源分析、风控辅助
+            IP geolocation at customer registration; used for registration source analysis
+            and risk-control assistance
+            optional：只在注册场景需要；如果客户注册不采集 IP 归属地，可以不引入
+            optional: only needed in the registration scenario; if customer registration
+            does not collect IP geolocation, it can be omitted
+            compile：注册流程中的 IP 解析直接使用
+            compile: IP resolution in the registration flow is used directly
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-biz-location-spring-boot-starter</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            操作审计：realm-audit-logging-spring-boot-starter
+            Operational audit logging: realm-audit-logging-spring-boot-starter
+            客户资料变更、积分调整、等级变更等敏感操作需要审计；通过 @AuditLog 注解
+            Sensitive operations like customer profile changes, point adjustments, and tier
+            changes need auditing; through the @AuditLog annotation
+            compile：@AuditLog 注解直接使用
+            compile: the @AuditLog annotation is used directly
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-audit-logging-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            注意：本模块不引入 realm-authorization-spring-boot-starter。
+            客户的授权模型与员工 RBAC 不同——客户只有"本人"权限
+            （member_user.id == current_user_id），不需要角色-菜单-权限标识的决策体系。
+            realm-authorization 是 Workforce IAM 的配套模块，CIAM 不使用。
+            Note: this module does NOT introduce realm-authorization-spring-boot-starter.
+            The customer authorization model differs from workforce RBAC — customers only
+            have "self" authority (member_user.id == current_user_id) and do not need
+            the role-menu-permission decision system. realm-authorization is a companion
+            to Workforce IAM and is not used by CIAM.
+        -->
+
+        <!--
+            注意：本模块不引入 realm-workforce-identity。
+            CIAM 与 Workforce IAM 是两个独立身份域，不共享用户表、不互相依赖。
+            如果需要"员工也是客户"或"客户升级为员工"的场景，由应用层
+            （realm-server 的编排服务）监听两侧的事件并协调。
+            Note: this module does NOT introduce realm-workforce-identity.
+            CIAM and Workforce IAM are two independent identity domains; they do not share
+            user tables and do not depend on each other. If a "staff is also a customer"
+            or "customer is promoted to staff" scenario is needed, it is coordinated by
+            the application layer (realm-server's orchestration service) listening to
+            events from both sides.
+        -->
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产
+            test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

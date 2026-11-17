@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-websocket-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：WebSocket 连接治理与跨节点中继
+        Responsibility boundary: WebSocket connection governance and cross-node relay
+        仅包含：本地连接注册/注销、按用户/房间/主题的本地索引、中继信封格式约定、
+                可替换的中继 SPI、本地投递、连接级可观测性
+        Only contains: local connection register/unregister, local indexes by user/room/topic,
+                relay envelope format contract, replaceable relay SPI, local delivery,
+                connection-level observability
+        不包含：业务消息的解析与语义处理、跨节点全局 Session 注册表、
+                替应用决定投递保证（at-most-once / at-least-once）
+        Does not contain: business message parsing or semantic handling, cross-node global
+                session registry, delivery guarantees on behalf of the application
+                (at-most-once / at-least-once)
+        依据：WebSocketSession 不可序列化（绑定 JVM I/O 通道），跨节点投递必须采用
+        "广播 + 本地匹配"模式，而非共享 Session 或远程直连
+        Basis: WebSocketSession is non-serializable (bound to JVM I/O channels);
+        cross-node delivery must use "broadcast + local matching", not shared sessions
+        or direct remote calls
+    -->
+    <description>
+        WebSocket 连接治理与跨节点中继：本地连接生命周期、中继信封、可替换的中继 SPI、本地投递、连接级可观测性。
+        不包含业务消息解析、全局 Session 注册表、投递保证决策；跨节点采用“广播 + 本地匹配”模式。
+        WebSocket connection governance and cross-node relay: local connection lifecycle,
+        relay envelope, replaceable relay SPI, local delivery, connection-level observability.
+        No business message parsing, global session registry, or delivery guarantee decisions;
+        cross-node uses "broadcast + local matching".
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、通用枚举；连接鉴权失败、中继发布失败时
+            抛出 BusinessException（携带错误码），由 realm-web 的
+            GlobalExceptionHandler 统一转换，本模块不处理 HTTP 响应
+            Provides BusinessException, common enums; connection auth failures and relay
+            publish failures throw BusinessException (with an error code), which realm-web's
+            GlobalExceptionHandler converts; this module does not handle HTTP responses
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合、JSON 辅助等工具；中继信封序列化、连接元数据处理需要
+            Provides string, collection, JSON helper utilities; needed for relay envelope
+            serialization and connection metadata handling
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Auto-configuration foundation
+            本模块包含自动配置类与配置属性类，必须显式声明；
+            与 realm-data-access、realm-data-jpa、realm-data-redis、
+            realm-distributed-transaction、realm-feature-env、realm-file、
+            realm-messaging、realm-multitenancy、realm-mybatis-plus、
+            realm-object-storage、realm-openfeign、realm-scheduling、
+            realm-stability、realm-web 等模块风格一致
+            This module contains auto-configuration and configuration-property classes;
+            declared explicitly for consistency with realm-data-access, realm-data-jpa,
+            realm-data-redis, realm-distributed-transaction, realm-feature-env, realm-file,
+            realm-messaging, realm-multitenancy, realm-mybatis-plus, realm-object-storage,
+            realm-openfeign, realm-scheduling, realm-stability, and realm-web
+            compile：自动配置类直接使用
+            compile: auto-configuration classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            WebSocket 核心：Spring WebSocket 支持
+            WebSocket core: Spring WebSocket support
+            提供 WebSocketSession、HandshakeInterceptor、WebSocketHandler 等核心类型；
+            本地连接治理与握手鉴权建立在其上
+            Provides WebSocketSession, HandshakeInterceptor, WebSocketHandler etc.;
+            local connection governance and handshake authentication build on it
+            compile：WebSocket 连接治理是本模块的核心能力，不能 optional
+            compile: WebSocket connection governance is this module's core capability,
+            cannot be optional
+            传递引入 spring-websocket、spring-web、spring-messaging、spring-boot-starter-web
+            Transitively brings spring-websocket, spring-web, spring-messaging,
+            spring-boot-starter-web
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
+        <!--
+            Spring Messaging：传输无关的消息模型
+            Spring Messaging: transport-agnostic message model
+            提供 Message<T>、MessageHeaders 等抽象；中继信封的构造与消费使用这些类型
+            Provides Message<T>, MessageHeaders etc.; relay envelope construction and
+            consumption use these types
+            compile：中继信封建立在 Spring Messaging 模型之上，不重复定义消息结构
+            compile: relay envelope builds on Spring Messaging model; no duplicate message
+            structure definition
+            注：spring-boot-starter-websocket 会传递引入 spring-messaging，
+            但按"直接使用即直接声明"原则显式声明
+            Note: spring-boot-starter-websocket transitively brings spring-messaging,
+            but declared explicitly per "use directly, declare directly"
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-messaging</artifactId>
+        </dependency>
+
+        <!--
+            Redis 中继（optional）：默认的跨节点中继实现
+            Redis relay (optional): default cross-node relay implementation
+            提供 RedisTemplate、RedisMessageListenerContainer；RedisMessageBus 和
+            RedisRelaySubscriber 依赖它们
+            Provides RedisTemplate, RedisMessageListenerContainer; RedisMessageBus and
+            RedisRelaySubscriber depend on them
+            optional：单机可退化为 InMemoryMessageBus；只有需要跨节点广播时才引入 Redis
+            optional: single-node can degrade to InMemoryMessageBus; Redis is pulled in
+            only when cross-node broadcast is needed
+            注意：使用 realm-data-redis 而非 spring-boot-starter-data-redis，
+            复用 Redisson 作为唯一 RedisConnectionFactory，避免与 Lettuce 的
+            RedisConnectionFactory 冲突（realm-data-redis 已排除 Lettuce 并锁定
+            redisson-spring-data-35）
+            Note: uses realm-data-redis instead of spring-boot-starter-data-redis,
+            reusing Redisson as the sole RedisConnectionFactory and avoiding conflict with
+            Lettuce's RedisConnectionFactory (realm-data-redis already excludes Lettuce
+            and pins redisson-spring-data-35)
+            相关配置类通过 @ConditionalOnClass(RedisTemplate.class) 条件化
+            Related configs gated by @ConditionalOnClass(RedisTemplate.class)
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-data-redis-spring-boot-starter</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            Actuator（optional）：指标暴露端点
+            Actuator (optional): metrics exposure endpoints
+            提供 /actuator/metrics 端点，用于暴露已采集的指标；
+            指标采集由 micrometer-core 完成，两者独立
+            Provides /actuator/metrics endpoint to expose collected metrics; metric
+            collection is done by micrometer-core, and the two are independent
+            optional：应用需要端点时自行引入，本模块不强制所有 WebSocket 服务
+            暴露管理端点
+            optional: apps pull it in when endpoints are needed; this module does not
+            force management endpoint exposure on all WebSocket services
+            版本由 Spring Boot BOM 管理
+            Version managed by Spring Boot BOM
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            Micrometer（optional）：连接级指标门面
+            Micrometer (optional): connection-level metrics facade
+            提供 MeterRegistry、Gauge、Counter；WebSocketMetrics 通过它暴露
+            在线连接数、消息速率、失败率
+            Provides MeterRegistry, Gauge, Counter; WebSocketMetrics exposes active sessions,
+            message rate, and failure rate through it
+            optional：MeterRegistry 缺席时降级为 no-op，指标采集不会因缺少 Micrometer
+            而阻塞连接治理
+            optional: degrades to no-op when MeterRegistry is absent; metric collection
+            does not block connection governance due to missing Micrometer
+            注意：optional 依赖要求 WebSocketMetrics 的注册通过
+            @ConditionalOnClass(MeterRegistry.class) 条件化，且不能被无条件加载的
+            配置类直接引用
+            Note: optional dependency requires WebSocketMetrics registration to be gated by
+            @ConditionalOnClass(MeterRegistry.class), and not directly referenced by
+            unconditionally loaded configuration classes
+            版本由 Spring Boot BOM 管理
+            Version managed by Spring Boot BOM
+        -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            自动配置元数据生成器（optional）：生成 spring-autoconfigure-metadata.properties
+            Autoconfigure metadata processor (optional)
+            启动时提前过滤不匹配的自动配置，降低启动开销
+            Pre-filters non-matching auto-configurations at startup to reduce boot cost
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；
+            用于验证本地注册表、中继信封序列化、条件装配
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito; used to verify
+            local registry, relay envelope serialization, and conditional assembly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产
+            test scope, not propagated to production
+            与 realm-data-access、realm-data-jpa、realm-data-redis 等模块风格一致
+            Consistent with realm-data-access, realm-data-jpa, realm-data-redis, etc.
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

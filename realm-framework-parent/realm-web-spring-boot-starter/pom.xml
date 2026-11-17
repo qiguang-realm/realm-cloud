@@ -1,0 +1,366 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-web-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：HTTP 传输层横切关注点的可组合、可退让自动配置
+        Responsibility boundary: composable, deferable auto-configuration for
+        HTTP transport cross-cutting concerns
+        仅包含：RFC 9457 ProblemDetail 异常映射、校验异常转换、W3C Trace Context、
+                日志与脱敏、分页参数绑定、版本号提取、安全响应头与 CORS、
+                Web 文件适配（MultipartFile 桥接、HTTP 文件响应写出）
+        Only contains: RFC 9457 ProblemDetail exception mapping, validation exception
+                conversion, W3C Trace Context, logging & masking, pagination binding,
+                version extraction, security headers & CORS, web file adapters
+                (MultipartFile bridging, HTTP file response writing)
+        不包含：SecurityFilterChain、JWT 解码、授权规则、RPC 出站调用、
+                OpenAPI 文档强制绑定、幂等存储层实现、业务错误码枚举、
+                文件解析引擎（PDFBox / POI / Fesod 的实现留在 realm-file）
+        Does not contain: SecurityFilterChain, JWT decoding, authorization rules,
+                RPC outbound calls, forced OpenAPI binding, idempotency storage,
+                business error code enums, file parsing engines (PDFBox / POI / Fesod
+                implementations stay in realm-file)
+        所有能力必须包裹在 @ConditionalOnMissingBean / @ConditionalOnClass / @ConditionalOnProperty 中
+        All capabilities must be wrapped in @ConditionalOnMissingBean /
+        @ConditionalOnClass / @ConditionalOnProperty
+        依赖方向：realm-web → realm-file、realm-utils、realm-core（单向）。
+        realm-file / realm-utils / realm-core 均不依赖 realm-web
+        Dependency direction: realm-web → realm-file, realm-utils, realm-core
+        (unidirectional). None of realm-file / realm-utils / realm-core depends on realm-web
+    -->
+    <description>
+        HTTP 传输层横切关注点：RFC 9457 异常映射、W3C Trace Context、日志脱敏、分页绑定、
+        版本提取、安全响应头与 CORS、Web 文件适配（MultipartFile 桥接、HTTP 文件响应写出）。
+        不含认证授权、RPC 出站调用、OpenAPI 强制绑定、业务错误码、文件解析引擎；
+        所有能力条件装配、可完全关闭。
+        HTTP transport cross-cutting concerns: RFC 9457 exception mapping, W3C Trace Context,
+        logging &amp; masking, pagination binding, version extraction, security headers &amp; CORS,
+        web file adapters (MultipartFile bridging, HTTP file response writing).
+        No auth/authz, no RPC outbound, no forced OpenAPI binding, no business error codes,
+        no file parsing engines; all capabilities are conditionally assembled and fully
+        disable-able.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 PageResult、BusinessException、SubjectContext、ApiResponse；
+            异常映射、分页绑定、ResponseEntityBuilder 复用这些契约
+            Provides PageResult, BusinessException, SubjectContext, ApiResponse;
+            exception mapping, pagination binding, and ResponseEntityBuilder reuse
+            these contracts
+            注意：按 ADR-002 路径 A，异常默认返回 ProblemDetail；ApiResponse 仅在
+            realm.web.error.format=api-response 时由 ApiResponseBodyAdvice 包装，
+            GlobalExceptionHandler 本身不直接构造 ApiResponse
+            Note: per ADR-002 path A, exceptions default to ProblemDetail; ApiResponse is
+            only wrapped by ApiResponseBodyAdvice when realm.web.error.format=api-response;
+            GlobalExceptionHandler itself does not construct ApiResponse directly
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合、JSON 辅助、文件 IO 工具（FileConvertUtil、FileMetadataUtil）；
+            Web 文件适配层（WebFileConvertUtil、FileResponseUtils）委托这些工具完成
+            纯 IO 转换与元数据读取
+            Provides string, collection, JSON helpers and file IO utilities
+            (FileConvertUtil, FileMetadataUtil); the web file adapters
+            (WebFileConvertUtil, FileResponseUtils) delegate to these utilities for
+            pure IO conversion and metadata reading
+            compile：Web 文件适配层直接使用
+            compile: web file adapters use it directly
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            文件数据交换抽象：realm-file-spring-boot-starter
+            File data exchange abstraction: realm-file-spring-boot-starter
+            WebFileReaderUtil 委托 FileReaderUtil 完成 Excel / CSV / TXT / JSON 解析；
+            FileResponseUtils 可复用文件元数据读取
+            WebFileReaderUtil delegates to FileReaderUtil for Excel / CSV / TXT / JSON
+            parsing; FileResponseUtils can reuse file metadata reading
+            compile：Web 文件适配层直接使用核心解析逻辑
+            compile: web file adapters use the core parsing logic directly
+            注意：realm-file 的解析引擎（Fesod / POI / Univocity / PDFBox）是
+            compile / optional，其中 Fesod 为 compile 会传递；POI / Univocity / PDFBox
+            为 optional 不会传递——Web 场景若要处理 Excel / CSV，需要调用方（realm-server）
+            自行引入对应引擎
+            Note: realm-file's parsing engines (Fesod / POI / Univocity / PDFBox) are
+            compile / optional; Fesod is compile and propagates, while POI / Univocity /
+            PDFBox are optional and do not propagate — for web scenarios that need to
+            handle Excel / CSV, the caller (realm-server) must explicitly pull in the
+            corresponding engine
+            依赖方向：realm-web → realm-file（单向）；realm-file 不依赖 realm-web
+            Dependency direction: realm-web → realm-file (unidirectional);
+            realm-file does not depend on realm-web
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-file-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Auto-configuration foundation
+            本模块包含自动配置类与配置属性类，必须显式声明；
+            与 realm-data-access、realm-data-jpa、realm-data-redis、
+            realm-distributed-transaction、realm-feature-env、realm-file、
+            realm-messaging、realm-multitenancy、realm-mybatis-plus、
+            realm-object-storage、realm-openfeign、realm-scheduling、
+            realm-stability 等模块风格一致
+            This module contains auto-configuration and configuration-property classes;
+            declared explicitly for consistency with realm-data-access, realm-data-jpa,
+            realm-data-redis, realm-distributed-transaction, realm-feature-env, realm-file,
+            realm-messaging, realm-multitenancy, realm-mybatis-plus, realm-object-storage,
+            realm-openfeign, realm-scheduling, and realm-stability
+            compile：自动配置类直接使用
+            compile: auto-configuration classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            Web 核心：Spring MVC
+            Web core: Spring MVC
+            提供 DispatcherServlet、HandlerMethodArgumentResolver、ResponseBodyAdvice、
+            MultipartFile 等 Web 基础设施
+            Provides DispatcherServlet, HandlerMethodArgumentResolver, ResponseBodyAdvice,
+            MultipartFile, and other web infrastructure
+            compile：本模块的核心运行时依赖
+            compile: core runtime dependency of this module
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!--
+            参数校验：Bean Validation
+            Bean validation
+            提供 @NotNull、@Valid 等校验注解与 Hibernate Validator 实现；
+            校验异常映射需要
+            Provides validation annotations and Hibernate Validator; required by
+            validation exception mapping
+            compile：校验异常到 ProblemDetail 的转换是本模块核心能力
+            compile: conversion of validation exceptions to ProblemDetail is a core
+            capability
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!--
+            安全核心（provided）：仅用于异常类型映射
+            Security core (provided): used only for exception type mapping
+            只 import AccessDeniedException、AuthenticationException 等异常类型，
+            禁止定义 SecurityFilterChain、@EnableWebSecurity
+            Only imports exception types like AccessDeniedException, AuthenticationException;
+            SecurityFilterChain and @EnableWebSecurity are prohibited
+            provided：由安全专用 starter 提供；本模块不强制安全依赖
+            provided: supplied by the security starter; this module does not force a
+            security dependency
+            注意：GlobalExceptionHandler 中处理这些异常的 @ExceptionHandler 方法
+            必须放在 @ConditionalOnClass(AccessDeniedException.class) 的嵌套配置类中，
+            否则应用没有 Spring Security 时会抛 NoClassDefFoundError
+            Note: the @ExceptionHandler methods for these exceptions in
+            GlobalExceptionHandler must be placed in a nested configuration class gated by
+            @ConditionalOnClass(AccessDeniedException.class); otherwise apps without Spring
+            Security throw NoClassDefFoundError
+        -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            OpenAPI 注解（optional）：@Schema 用于 ProblemDetail 扩展属性的文档描述
+            OpenAPI annotations (optional): @Schema for ProblemDetail extension properties
+            documentation
+            optional：仅在启用 OpenAPI 时生效，不传递到下游
+            optional: effective only when OpenAPI is enabled; not propagated downstream
+            注意：如果本模块代码中直接 import @Schema，建议改用
+            io.swagger.core.v3:swagger-annotations-jakarta（纯注解，不引入 spring-webmvc、
+            swagger-ui 等完整 Web 栈），与 realm-core 保持一致；
+            如果代码中没有直接 import @Schema，本依赖可以移除
+            Note: if this module's code directly imports @Schema, prefer
+            io.swagger.core.v3:swagger-annotations-jakarta (pure annotations, no
+            spring-webmvc / swagger-ui), consistent with realm-core; if the code does not
+            directly import @Schema, this dependency can be removed
+        -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <scope>optional</scope>
+        </dependency>
+
+        <!--
+            OpenTelemetry API（compile）：TraceContextFilter 在编译期直接使用
+            OpenTelemetry API (compile): used at compile time by TraceContextFilter
+            compile：API 需在编译期可见；运行时由 sdk 提供实现
+            compile: API visible at compile time; implementation provided by sdk at runtime
+            注意：compile 作用域意味着 API 会传递给所有下游应用，
+            @ConditionalOnClass(OpenTelemetry.class) 总是通过；
+            SDK 缺席时 GlobalOpenTelemetry.get() 返回 no-op，traceId 为空，
+            而不是"退化为自管理 traceId"；FallbackTraceIdGenerator 仅在
+            opentelemetry-api 完全缺席时生效，compile 作用域下它不会缺席
+            Note: compile scope means the API propagates to all downstream apps;
+            @ConditionalOnClass(OpenTelemetry.class) always passes; when the SDK is absent,
+            GlobalOpenTelemetry.get() returns a no-op and traceId is empty, rather than
+            "falling back to a self-managed traceId"; FallbackTraceIdGenerator only takes
+            effect when opentelemetry-api is entirely absent, which never happens under
+            compile scope
+            版本由 realm-dependencies 中导入的 opentelemetry-bom 统一管理
+            Version managed by the opentelemetry-bom imported in realm-dependencies
+        -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+        </dependency>
+
+        <!--
+            OpenTelemetry 稳定语义约定常量（compile）
+            OpenTelemetry stable semantic convention constants (compile)
+
+            提供 HttpAttributes / UrlAttributes / ServerAttributes 等稳定常量类，
+            替代字符串字面量属性名。TraceContextFilter 直接使用。
+
+            GroupId 是 io.opentelemetry.semconv（注意多一级 semconv），
+            与 opentelemetry-api 的 io.opentelemetry 不同。
+
+            不要使用 opentelemetry-semconv-incubating：该 artifact 带 -alpha 后缀，
+            无兼容性保证，库类代码不应依赖。
+
+            版本管理：opentelemetry-bom 不管理此 artifact，需在
+            realm-dependencies 的 dependencyManagement 中显式声明版本，
+            或在本模块中显式指定 <version>。
+        -->
+        <dependency>
+            <groupId>io.opentelemetry.semconv</groupId>
+            <artifactId>opentelemetry-semconv</artifactId>
+        </dependency>
+
+        <!--
+            Spring Modulith API：模块化边界声明
+            Spring Modulith API: modular boundary declaration
+            提供 @ApplicationModule 与 @NamedInterface 注解，用于声明模块依赖白名单。
+            Provides @ApplicationModule and @NamedInterface annotations for declaring
+            module dependency whitelists.
+            compile：package-info.java 与架构测试直接使用
+            compile: used directly by package-info.java and architecture tests
+        -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-api</artifactId>
+        </dependency>
+
+        <!--
+            自动配置元数据生成器（optional）：生成 spring-autoconfigure-metadata.properties
+            Autoconfigure metadata processor (optional)
+            启动时提前过滤不匹配的自动配置，降低启动开销
+            Pre-filters non-matching auto-configurations at startup to reduce boot cost
+            依据 Spring Boot 官方对包含自动配置的模块的要求
+            Required by Spring Boot official guidance for auto-configuration modules
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；
+            OTel SDK 与 SDK Testing 让 GlobalOpenTelemetry 不为 no-op，
+            并可断言 Span 导出
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito; OTel SDK & SDK Testing
+            ensure GlobalOpenTelemetry is not no-op and spans can be asserted
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-testing</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产
+            test scope, not propagated to production
+            与 realm-data-access、realm-data-jpa、realm-data-redis 等模块风格一致
+            Consistent with realm-data-access, realm-data-jpa, realm-data-redis, etc.
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

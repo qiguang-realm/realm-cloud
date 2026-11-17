@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-test</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：测试资产总括（测试基线 + 测试设施）
+        Responsibility boundary: test asset umbrella (test baseline + test facilities)
+        仅包含：测试依赖聚合、测试基类、realm 契约断言工具、
+                可选的测试扩展（ArchUnit、Testcontainers、H2、Redis Mock、Podam）
+        Only contains: test dependency aggregation, test base classes, realm contract
+                assertions, optional test extensions (ArchUnit, Testcontainers, H2,
+                Redis Mock, Podam)
+        不包含：任何 src/main 下的生产级自动配置、业务逻辑、技术契约定义
+        Does not contain: any production auto-configuration under src/main, business logic,
+                or technical contract definitions
+        铁律：下游必须以 <scope>test</scope> 引入本模块，禁止进入生产类路径
+        Iron rule: downstream must import this module with <scope>test</scope>;
+        never allowed on the production classpath
+    -->
+    <description>
+        测试资产总括：聚合 JUnit 5、AssertJ、Mockito 等测试依赖，提供 realm 契约断言工具与可选测试扩展。
+        不包含生产级自动配置、业务逻辑或技术契约定义。
+        下游必须以 test 作用域引入，禁止进入生产类路径。
+        Test asset umbrella: aggregates JUnit 5, AssertJ, Mockito and other test dependencies,
+        provides realm contract assertions and optional test extensions.
+        No production auto-configuration, business logic, or technical contract definitions.
+        Downstream must import with test scope; never on the production classpath.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            Spring Boot 测试全家桶 / Spring Boot test bundle
+            传递引入 JUnit 5、AssertJ、Mockito、Hamcrest、JSONassert、JsonPath、XMLUnit、Spring Test
+            Transitively brings JUnit 5, AssertJ, Mockito, Hamcrest, JSONassert, JsonPath,
+            XMLUnit, Spring Test
+            compile：本模块的核心聚合依赖；下游以 test 作用域引入本模块后，
+            这些框架仅在测试类路径上生效
+            compile: core aggregation dependency; after downstream imports this module
+            with test scope, these frameworks are only on the test classpath
+            风险提示：如果下游误用 compile 作用域引入本模块，JUnit、Mockito 等测试框架
+            会进入生产类路径，造成依赖污染；下游必须始终以 test 作用域引入
+            Risk note: if downstream mistakenly imports this module with compile scope,
+            JUnit, Mockito and other test frameworks enter the production classpath,
+            causing dependency pollution; downstream must always use test scope
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+        </dependency>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 PageResult、ApiResponse、BusinessException；本模块的断言工具直接引用
+            这些契约类型
+            Provides PageResult, ApiResponse, BusinessException; this module's assertion
+            utilities reference these contract types directly
+            compile：断言工具类的编译期与测试运行期都需要这些类型；
+            下游以 test 作用域引入本模块时，realm-core 只会出现在测试类路径上，
+            不会进入生产类路径
+            compile: assertion utilities need these types at compile time and test runtime;
+            when downstream imports this module with test scope, realm-core appears only
+            on the test classpath, never on the production classpath
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合、日期等工具；测试基类与断言工具需要
+            Provides string, collection, date utilities; needed by test base classes and
+            assertion utilities
+            compile：本模块的测试工具类直接使用；与 realm-core 相同，
+            下游以 test 作用域引入时只出现在测试类路径上
+            compile: this module's test utilities use them directly; same as realm-core,
+            appears only on the test classpath when downstream imports with test scope
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            架构测试：ArchUnit JUnit 5（optional） / Architecture testing: ArchUnit JUnit 5 (optional)
+            用于验证模块边界、internal 泄漏、allowedDependencies 违规等；
+            ADR-001/ADR-002 的自动化门禁依赖它
+            Used to verify module boundaries, internal leakage, allowedDependencies
+            violations; ADR-001/ADR-002 automated gates rely on it
+            optional：不是所有模块都需要架构测试；需要时由使用方显式引入
+            optional: not every module needs architecture tests; pulled in explicitly
+            when needed
+            版本由 realm-dependencies 的 archunit.version 管理
+            Version managed by realm-dependencies' archunit.version
+        -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            Testcontainers 集成（optional） / Testcontainers integration (optional)
+            提供 @ServiceConnection 等容器测试支撑；集成测试需要真实中间件时引入
+            Provides @ServiceConnection and other container test support; pulled in when
+            integration tests need real middleware
+            optional：需要 Docker 环境，不是所有测试都需要
+            optional: requires Docker; not all tests need it
+            版本由 Spring Boot BOM 管理
+            Version managed by Spring Boot BOM
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            内存数据库：H2（optional） / In-memory database: H2 (optional)
+            用于 @DataJpaTest、@MybatisTest 等切片测试的数据库替代
+            Used as database substitute for @DataJpaTest, @MybatisTest and other slice tests
+            optional：只有持久层测试需要
+            optional: only persistence-layer tests need it
+            版本由 realm-dependencies 的 h2.version 管理
+            Version managed by realm-dependencies' h2.version
+        -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            Redis 模拟：jedis-mock（optional） / Redis mock: jedis-mock (optional)
+            用于缓存层测试，避免依赖真实 Redis 实例
+            Used for cache-layer tests, avoiding a real Redis instance
+            optional：只有缓存相关测试需要
+            optional: only cache-related tests need it
+            版本由 realm-dependencies 的 jedis-mock.version 管理
+            Version managed by realm-dependencies' jedis-mock.version
+        -->
+        <dependency>
+            <groupId>com.github.fppt</groupId>
+            <artifactId>jedis-mock</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            随机 POJO 生成：Podam（optional） / Random POJO generator: Podam (optional)
+            用于生成测试数据，减少手写 fixture
+            Used to generate test data, reducing handwritten fixtures
+            optional：按需引入
+            optional: pulled in on demand
+            版本由 realm-dependencies 的 podam.version 管理
+            Version managed by realm-dependencies' podam.version
+        -->
+        <dependency>
+            <groupId>uk.co.jemos.podam</groupId>
+            <artifactId>podam</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+    </dependencies>
+
+</project>

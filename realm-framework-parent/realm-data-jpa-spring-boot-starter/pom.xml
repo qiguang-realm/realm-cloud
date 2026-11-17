@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-data-jpa-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：Spring Data JPA 适配层（ORM 适配器）
+        Responsibility boundary: Spring Data JPA adapter (ORM adapter)
+        建立在 realm-data-access-spring-boot-starter 之上，负责 EntityManagerFactory、
+        Repository 扫描、JpaTransactionManager 定型
+        Built on realm-data-access-spring-boot-starter; responsible for EntityManagerFactory,
+        Repository scanning, JpaTransactionManager finalization
+        与 realm-mybatis-plus-spring-boot-starter 平行：应用二选一，或按需共存
+        Parallel to realm-mybatis-plus-spring-boot-starter: apps pick one, or coexist when needed
+        不包含：连接池、多数据源路由、事务基础设施（由 realm-data-access-spring-boot-starter 提供）
+        Does not contain: connection pool, multi-datasource routing, transaction infrastructure
+        (provided by realm-data-access-spring-boot-starter)
+    -->
+    <description>
+        Spring Data JPA 适配层：EntityManagerFactory、Repository 扫描、JpaTransactionManager 定型。
+        建立在 realm-data-access-spring-boot-starter 之上，与 realm-mybatis-plus-spring-boot-starter 平行。
+        不包含连接池、多数据源路由、事务基础设施。
+        Spring Data JPA adapter: EntityManagerFactory, Repository scanning, JpaTransactionManager finalization.
+        Built on realm-data-access-spring-boot-starter; parallel to realm-mybatis-plus-spring-boot-starter.
+        No connection pool, multi-datasource routing, or transaction infrastructure.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            数据访问基础设施：realm-data-access-spring-boot-starter
+            Data access foundation: realm-data-access-spring-boot-starter
+            提供 DataSource、连接池、多数据源路由、事务基础设施；
+            JPA 的 EntityManagerFactory 依赖 DataSource
+            Provides DataSource, connection pool, multi-datasource routing, transaction infrastructure;
+            JPA's EntityManagerFactory depends on DataSource
+            compile：本模块的运行必须建立在其之上
+            compile: this module's runtime must build on it
+            关键协作：realm-data-access 通过 @ConditionalOnMissingBean(PlatformTransactionManager.class)
+            提供默认的 DataSourceTransactionManager；本模块的自动配置类需要
+            @AutoConfigureBefore(DataSourceTransactionManagerAutoConfiguration.class)
+            注册 JpaTransactionManager，确保 JPA 场景下事务管理器被定型为 JpaTransactionManager，
+            否则 @Transactional 与 EntityManager 的生命周期会不一致
+            Key collaboration: realm-data-access provides a default DataSourceTransactionManager via
+            @ConditionalOnMissingBean(PlatformTransactionManager.class); this module's auto-configuration
+            must register JpaTransactionManager before DataSourceTransactionManagerAutoConfiguration
+            (via @AutoConfigureBefore) so that in JPA scenarios the transaction manager is finalized
+            as JpaTransactionManager; otherwise @Transactional and EntityManager lifecycles diverge
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-data-access-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException；JPA 的 PersistenceException 等由本模块转换为
+            BusinessException（携带错误码），再由 realm-web 的
+            GlobalExceptionHandler 统一转换为 ProblemDetail 或 ApiResponse，
+            本模块不处理 HTTP 响应
+            Provides BusinessException; JPA's PersistenceException etc. are converted by this module
+            to BusinessException (with an error code), which realm-web's GlobalExceptionHandler
+            then converts uniformly to ProblemDetail or ApiResponse; this module does not
+            handle HTTP responses
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合等工具；Repository 命名、JpaPageUtils 中的 PageParam 转换等需要
+            注意：实体审计字段（@CreatedBy / @LastModifiedDate）由 Spring Data JPA 的
+            AuditingEntityListener 完成，不由 realm-utils 承担
+            Provides string, collection utilities; needed for repository naming and PageParam
+            conversion in JpaPageUtils. Note: entity audit fields (@CreatedBy / @LastModifiedDate)
+            are handled by Spring Data JPA's AuditingEntityListener, not by realm-utils
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Auto-configuration foundation
+            本模块包含自动配置类与配置属性类，必须显式声明；
+            与 realm-audit-logging、realm-data-scope、realm-authorization、
+            realm-biz-location、realm-config-client、realm-data-access 风格一致
+            This module contains auto-configuration and configuration-property classes;
+            declared explicitly for consistency with realm-audit-logging, realm-data-scope,
+            realm-authorization, realm-biz-location, realm-config-client, and realm-data-access
+            compile：自动配置类直接使用 / compile: auto-configuration classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            Spring Data JPA 官方 Starter：核心 ORM 适配依赖
+            Spring Data JPA official starter: core ORM adapter dependency
+            传递引入 Hibernate、Spring Data JPA、Spring ORMs、HikariCP（经 starter-jdbc）
+            Transitively brings Hibernate, Spring Data JPA, Spring ORMs, HikariCP (via starter-jdbc)
+            compile：JPA 实体管理、Repository 扫描、事务定型均依赖于此
+            compile: JPA entity management, repository scanning, transaction finalization
+            all depend on it
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <!--
+            自动配置元数据生成器（optional）：生成 spring-autoconfigure-metadata.properties
+            Autoconfigure metadata processor (optional): generates
+            spring-autoconfigure-metadata.properties
+            启动时提前过滤不匹配的自动配置，降低启动开销
+            Pre-filters non-matching auto-configurations at startup to reduce boot cost
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；
+            H2 用于验证 EntityManagerFactory 与 JpaTransactionManager
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito;
+            H2 validates EntityManagerFactory and JpaTransactionManager
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- H2 内存数据库：测试 JPA 配置与事务管理器 / H2 in-memory DB: tests JPA configuration and transaction manager -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产 / test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

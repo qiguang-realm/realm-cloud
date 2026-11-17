@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-scheduling-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：调度基础设施的抽象与治理
+        Responsibility boundary: scheduling infrastructure abstraction and governance
+        仅包含：调度引擎 SPI、执行器生命周期管理、任务注册与状态约定、
+                调度可观测性埋点、与 Spring @Scheduled 的兼容桥接
+        Only contains: scheduling engine SPI, executor lifecycle management,
+                task registration & status contract, scheduling observability,
+                compatibility bridge with Spring @Scheduled
+        不包含：具体业务任务逻辑、重复 @EnableScheduling / @Scheduled 的基础能力、
+                强制绑定某一调度引擎
+        Does not contain: concrete business task logic, duplication of
+                @EnableScheduling / @Scheduled basics, forced binding to any single
+                scheduling engine
+        调度引擎（Quartz / XXL-JOB / PowerJob）作为可替换实现，
+        通过 SPI 与 @ConditionalOnClass 条件化接入
+        Scheduling engines (Quartz / XXL-JOB / PowerJob) are replaceable implementations,
+        wired via SPI and @ConditionalOnClass
+        依据：Spring Framework 的 TaskScheduler / @EnableScheduling 术语体系；
+        Quartz 的 Job / Trigger / Scheduler 三层分离模型
+        Basis: Spring Framework's TaskScheduler / @EnableScheduling terminology;
+        Quartz's Job / Trigger / Scheduler three-layer separation
+    -->
+    <description>
+        调度基础设施的抽象与治理：调度引擎 SPI、执行器生命周期管理、任务注册与状态约定、调度可观测性。
+        不包含具体业务任务逻辑，不重复 Spring @Scheduled 基础能力，不强制绑定单一调度引擎。
+        Scheduling infrastructure abstraction and governance: scheduling engine SPI,
+        executor lifecycle management, task registration &amp; status contract,
+        scheduling observability.
+        No concrete business task logic, no duplication of Spring @Scheduled basics,
+        no forced single-engine binding.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、通用枚举；任务注册失败、执行器生命周期异常时
+            抛出 BusinessException（携带错误码），由 realm-web 的
+            GlobalExceptionHandler 统一转换，本模块不处理 HTTP 响应
+            Provides BusinessException, common enums; task registration failures and
+            executor lifecycle errors throw BusinessException (with an error code),
+            which realm-web's GlobalExceptionHandler converts; this module does not
+            handle HTTP responses
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合、日期等工具；任务标识归一化、Cron 表达式处理需要
+            Provides string, collection, date utilities; needed for task identifier
+            normalization and cron expression handling
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Auto-configuration foundation
+            提供条件装配与配置属性绑定；本模块的调度引擎选择、执行器生命周期管理
+            直接依赖这些注解
+            Provides conditional assembly and configuration property binding; this module's
+            scheduling engine selection and executor lifecycle management directly depend
+            on these annotations
+            compile：自动配置类直接使用；与 realm-data-access、realm-data-jpa、
+            realm-data-redis、realm-distributed-transaction、realm-feature-env、
+            realm-file、realm-messaging、realm-multitenancy、realm-mybatis-plus、
+            realm-object-storage、realm-openfeign 等模块风格一致
+            compile: auto-configuration classes use it directly; consistent with
+            realm-data-access, realm-data-jpa, realm-data-redis,
+            realm-distributed-transaction, realm-feature-env, realm-file, realm-messaging,
+            realm-multitenancy, realm-mybatis-plus, realm-object-storage, and
+            realm-openfeign
+            Note: replaces spring-boot-starter to avoid dragging in Logback, snakeyaml,
+            and other unnecessary transitive dependencies for a scheduling library
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            Spring 调度基础：@Scheduled / @EnableScheduling / TaskScheduler
+            Spring scheduling foundation: @Scheduled / @EnableScheduling / TaskScheduler
+            提供 Spring 自身的调度基础设施；本模块的 SPI 与桥接层建立在其上
+            Provides Spring's own scheduling infrastructure; this module's SPI and
+            bridge layer build on it
+            compile：自动配置与桥接直接使用
+            compile: auto-configuration and bridge use it directly
+            Note: spring-boot-autoconfigure transitively brings spring-context, but
+            declared explicitly per "use directly, declare directly"
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+
+        <!--
+            可选引擎：Quartz（optional） / Optional engine: Quartz (optional)
+            提供集群模式、持久化 JobStore、Cron 触发、错过触发策略等能力；
+            适合需要持久化与集群调度的场景
+            Provides clustered mode, persistent JobStore, cron triggers, misfire policies;
+            suitable for persistence and clustered scheduling
+            optional：只有显式启用 Quartz 引擎时才需要；
+            相关配置类通过 @ConditionalOnClass 条件化
+            optional: needed only when the Quartz engine is explicitly enabled;
+            related configs gated by @ConditionalOnClass
+            版本由 Spring Boot BOM 管理
+            Version managed by Spring Boot BOM
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-quartz</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            可选引擎：XXL-JOB（optional） / Optional engine: XXL-JOB (optional)
+            提供分布式调度中心、执行器注册、分片广播、失败重试、运维界面等能力
+            Provides distributed scheduling center, executor registration, sharding
+            broadcast, retry, and ops UI
+            optional：XXL-JOB 无官方 Spring Boot Starter，由本模块通过
+            @ConditionalOnClass 条件化接入；应用需自行引入并配置调度中心地址
+            optional: XXL-JOB has no official Spring Boot starter; this module wires it
+            conditionally via @ConditionalOnClass; apps bring it in and configure the
+            admin address
+            版本由 realm-dependencies 的 xxl-job.version 管理
+            Version managed by realm-dependencies' xxl-job.version
+        -->
+        <dependency>
+            <groupId>com.xuxueli</groupId>
+            <artifactId>xxl-job-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            Micrometer（optional）：调度可观测性指标
+            Micrometer (optional): scheduling observability metrics
+            提供 MeterRegistry、Counter、Timer；任务执行耗时、成功率、
+            最近一次执行状态通过它暴露
+            Provides MeterRegistry, Counter, Timer; task execution latency, success rate,
+            and last-run status are exposed through it
+            optional：MeterRegistry 缺席时降级为 no-op，指标采集不会阻塞调度治理；
+            与 realm-stability 共享同一 MeterRegistry
+            optional: degrades to no-op when MeterRegistry is absent; metric collection
+            does not block scheduling governance; shares the same MeterRegistry with
+            realm-stability
+        -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            自动配置元数据生成器（optional）：生成 spring-autoconfigure-metadata.properties
+            Autoconfigure metadata processor (optional)
+            启动时提前过滤不匹配的自动配置，降低启动开销
+            Pre-filters non-matching auto-configurations at startup to reduce boot cost
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；
+            用于验证引擎选择、执行器生命周期、可观测性埋点
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito; used to verify
+            engine selection, executor lifecycle, and observability instrumentation
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产 / test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

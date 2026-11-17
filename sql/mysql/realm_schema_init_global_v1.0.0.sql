@@ -22,7 +22,7 @@
 -- 国际标准的核心是严格区分 NULL（未知）和 ''（已知的空字符串）。全球领先企业的趋势是优先使用 NULL 来表示缺失数据，因为它语义更精确，且能避免与具有业务含义的空字符串混淆。
 
 -- 全球顶级企业标准：审计字段通常
--- 国际标准常用 created_at, updated_at, created_by, updated_by, deleted_at, version。
+-- 国际标准常用 created_at, updated_at, created_by, updated_by, deleted_at, deleted_by, version。
 -- 公共字段标准 DDL
 
     `version`int NOT NULL DEFAULT 1 COMMENT '乐观锁版本号（用于并发控制）',

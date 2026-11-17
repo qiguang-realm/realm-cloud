@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-authorization-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：授权决策（“谁可以做什么”） / Responsibility boundary: authorization decisions
+        仅包含：权限模型（RBAC/ABAC 策略评估）、方法级与 URL 级授权拦截、拒绝响应的统一格式化、与 realm 异常契约的集成
+        Only contains: permission model (RBAC/ABAC policy evaluation), method-level and URL-level
+        authorization interception, unified formatting of denial responses, integration with realm's exception contracts
+        不包含：用户登录、令牌签发、审计记录写入 / Does not contain: user login, token issuance, audit record writing
+        认证（令牌解析）为可选能力，由应用按需引入 spring-security-oauth2-resource-server；本模块聚焦授权决策本身
+        Authentication (token parsing) is optional; apps pull in spring-security-oauth2-resource-server
+        on demand; this module focuses on authorization decisions
+        依据：NIST SP 800-53 AC 族（Access Control）；OWASP Authorization Cheat Sheet；ISO/IEC 27001 职责分离
+        Basis: NIST SP 800-53 AC family; OWASP Authorization Cheat Sheet; ISO/IEC 27001 separation of duties
+    -->
+    <description>
+        授权决策：权限模型评估、方法级与 URL 级授权拦截、拒绝响应的统一格式化。
+        不包含用户登录、令牌签发、审计记录写入；认证能力由应用按需引入。
+        Authorization decisions: permission model evaluation, method-level and URL-level
+        authorization interception, unified formatting of denial responses.
+        No user login, token issuance, or audit record writing; authentication is
+        pulled in by the application on demand.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、SubjectContext 接口、通用枚举；
+            授权拒绝时通过 BusinessException 携带错误码，最终由 realm-web 的
+            GlobalExceptionHandler 转换为 ProblemDetail 或 ApiResponse
+            Provides BusinessException, SubjectContext interface, common enums;
+            authorization denials carry error codes via BusinessException, which realm-web's
+            GlobalExceptionHandler converts to ProblemDetail or ApiResponse
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合等工具；权限标识归一化、策略表达式处理需要
+            Provides string, collection utilities; needed for permission identifier normalization
+            and policy expression handling
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            Spring Boot 自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConditionalOnProperty / @ConfigurationProperties
+            Spring Boot auto-configuration foundation
+            本模块包含自动配置类，与 realm-audit-logging 保持一致，显式声明
+            This module contains auto-configuration classes; declared explicitly for consistency
+            with realm-audit-logging
+            compile：自动配置类直接使用 / compile: auto-configuration classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            Spring Security 完整栈：spring-boot-starter-security
+            Spring Security full stack: spring-boot-starter-security
+            传递引入 spring-security-core（AuthorizationManager / AuthorizationDecision）
+            与 spring-security-web（SecurityFilterChain / FilterChainProxy）；
+            使用 starter 而非单独声明 core/web，是为了让 Spring Boot 的版本管理和条件装配生效
+            Transitively brings spring-security-core (AuthorizationManager / AuthorizationDecision)
+            and spring-security-web (SecurityFilterChain / FilterChainProxy); using the starter
+            rather than declaring core/web separately so Spring Boot's version management
+            and conditional assembly take effect
+            compile：授权决策是本模块的核心能力，不能 provided
+            compile: authorization decisions are this module's core capability, cannot be provided
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!--
+            AOP 切面支持：方法级授权拦截 / AOP support: method-level authorization interception
+            提供 @Aspect、@Around 等切面基础设施；方法级 @RequirePermission 依赖它
+            Provides @Aspect, @Around and other AOP infrastructure; method-level @RequirePermission depends on it
+            compile：方法级授权是本模块的核心能力之一
+            compile: method-level authorization is one of this module's core capabilities
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!--
+            Web 基础（provided）：URL 级授权与拒绝响应格式化
+            Web foundation (provided): URL-level authorization and response formatting
+            Spring Security 本身依赖 Web 栈（spring-security-web 传递引入 spring-web、jakarta.servlet-api），
+            本模块无法完全避免传递；provided 声明的作用是明确本模块的编译期依赖边界，
+            不额外引入 Web 栈版本约束
+            Spring Security itself depends on the web stack (spring-security-web transitively brings
+            spring-web and jakarta.servlet-api); this module cannot fully avoid the transitive
+            dependency. The provided declaration makes the compile-time dependency boundary explicit
+            and adds no extra version constraint on the web stack
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            Servlet API（provided）：URL 级授权拦截的编译期依赖
+            Servlet API (provided): compile-time dependency for URL-level authorization interception
+            由 spring-security-web 传递引入；provided 声明仅为编译期显式化
+            Transitively brought by spring-security-web; the provided declaration is only for
+            explicit compile-time visibility
+        -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            OAuth2 资源服务器（optional）：JWT 解码与令牌校验
+            OAuth2 resource server (optional): JWT decoding and token validation
+            应用需要“从 JWT 中提取主体与权限声明”时引入；本模块的授权决策不强制依赖某种认证方式
+            Pulled in when apps need to extract subject and authority claims from JWTs;
+            this module's authorization decisions do not mandate a specific authentication mechanism
+            optional：授权决策与认证方式解耦；认证由应用按需选择
+            optional: authorization decisions are decoupled from the authentication mechanism;
+            apps choose authentication on demand
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            自动配置元数据生成器（optional）：生成 spring-autoconfigure-metadata.properties
+            Autoconfigure metadata processor (optional): generates spring-autoconfigure-metadata.properties
+            启动时提前过滤不匹配的自动配置，降低启动开销
+            Pre-filters non-matching auto-configurations at startup to reduce boot cost
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需 / Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；
+            spring-security-test 提供 @WithMockUser、@WithMockJwt 等授权测试支撑
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Spring Security 测试支撑：模拟认证主体与权限 -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            test 作用域，不传递到生产
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

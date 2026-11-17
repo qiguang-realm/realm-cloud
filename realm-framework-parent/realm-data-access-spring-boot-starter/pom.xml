@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-data-access-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：数据访问基础设施（ORM 无关）
+        Responsibility boundary: data access infrastructure (ORM-agnostic)
+        仅包含：连接池自动配置、多数据源路由、事务管理器基础设施
+        Only contains: connection pool auto-config, multi-datasource routing,
+        transaction manager infrastructure
+        不包含：任何 ORM 适配（MyBatis-Plus 在 realm-mybatis-plus-spring-boot-starter，
+        JPA 在 realm-data-jpa-spring-boot-starter）
+        Does not contain: any ORM adapter (MyBatis-Plus lives in
+        realm-mybatis-plus-spring-boot-starter, JPA in realm-data-jpa-spring-boot-starter)
+        事务管理原则：提供默认 DataSourceTransactionManager，但通过 @ConditionalOnMissingBean
+        让 ORM 模块可定型为 JpaTransactionManager 等
+        Transaction principle: provides a default DataSourceTransactionManager, but leaves
+        @ConditionalOnMissingBean room for ORM modules to set JpaTransactionManager etc.
+    -->
+    <description>
+        数据访问基础设施（ORM 无关）：连接池、多数据源路由、事务管理器基础设施。
+        不包含 MyBatis-Plus 或 JPA 适配；ORM 适配由各自的 starter 建立在本次之上。
+        事务管理器默认提供 DataSourceTransactionManager，可被 JPA 等 ORM 模块覆盖定型。
+        Data access infrastructure (ORM-agnostic): connection pool, multi-datasource routing,
+        transaction manager infrastructure. No MyBatis-Plus or JPA adapter; ORM adapters build on top.
+        Provides a default DataSourceTransactionManager, overridable by ORM modules (e.g. JPA).
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、通用枚举；数据源初始化失败、事务回滚异常时
+            抛出 BusinessException（携带错误码），由 realm-web 的
+            GlobalExceptionHandler 统一转换，本模块不处理 HTTP 响应
+            Provides BusinessException, common enums; datasource init failures and
+            transaction rollback exceptions throw BusinessException (with an error code),
+            which realm-web's GlobalExceptionHandler converts; this module does not
+            handle HTTP responses
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合等工具；数据源 key 解析、事务管理器命名等需要
+            Provides string, collection utilities; needed for datasource key resolution
+            and transaction manager naming
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            JDBC 基础：spring-boot-starter-jdbc
+            JDBC foundation: spring-boot-starter-jdbc
+            提供 DataSource 自动配置、HikariCP 连接池、JdbcTemplate、
+            DataSourceTransactionManager 基础
+            Provides DataSource auto-config, HikariCP pool, JdbcTemplate,
+            DataSourceTransactionManager foundation
+            compile：本模块的核心运行时依赖；HikariCP 由此传递引入，无需单独声明
+            compile: core runtime dependency; HikariCP comes transitively,
+            no separate declaration needed
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+
+        <!--
+            自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Auto-configuration foundation
+            本模块包含自动配置类与配置属性类，必须显式声明；
+            与 realm-audit-logging、realm-data-scope、realm-authorization、
+            realm-biz-location、realm-config-client 风格一致
+            This module contains auto-configuration and configuration-property classes;
+            declared explicitly for consistency with realm-audit-logging, realm-data-scope,
+            realm-authorization, realm-biz-location, and realm-config-client
+            compile：自动配置类直接使用 / compile: auto-configuration classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            多数据源路由：dynamic-datasource
+            Multi-datasource routing: dynamic-datasource
+            提供 @DS 注解、DynamicRoutingDataSource、多数据源下的 TransactionManager 注册
+            Provides @DS annotation, DynamicRoutingDataSource, per-datasource
+            TransactionManager registration
+            compile：多数据源是本模块区别于 spring-boot-starter-jdbc 的核心价值；
+            单数据源场景下 dynamic-datasource 退化为普通 DataSource，不影响使用
+            compile: multi-datasource is the core value differentiating this module from
+            spring-boot-starter-jdbc; in single-datasource scenarios, dynamic-datasource
+            degrades to a plain DataSource transparently
+            版本由父 POM 的 dynamic-datasource.version 统一管理
+            Version managed by parent POM's dynamic-datasource.version
+        -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>dynamic-datasource-spring-boot3-starter</artifactId>
+        </dependency>
+
+        <!--
+            可选连接池：Druid（optional） / Optional connection pool: Druid (optional)
+            HikariCP 已由 spring-boot-starter-jdbc 提供；Druid 是替代选项，应用按需引入
+            HikariCP is already provided by spring-boot-starter-jdbc; Druid is an alternative,
+            pulled in by apps on demand
+            optional：本模块的 Druid 相关配置类通过 @ConditionalOnClass 条件化，
+            Druid 缺席时零影响
+            optional: Druid-related configs are gated by @ConditionalOnClass;
+            zero impact when Druid is absent
+            版本由父 POM 的 druid.version 统一管理
+            Version managed by parent POM's druid.version
+        -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>druid-spring-boot-3-starter</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            自动配置元数据生成器（optional）：生成 spring-autoconfigure-metadata.properties
+            Autoconfigure metadata processor (optional): generates
+            spring-autoconfigure-metadata.properties
+            启动时提前过滤不匹配的自动配置，降低启动开销
+            Pre-filters non-matching auto-configurations at startup to reduce boot cost
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；
+            H2 用于验证 DataSource 自动配置
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito;
+            H2 validates DataSource auto-configuration
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- H2 内存数据库：测试 DataSource 与多数据源路由 / H2 in-memory DB: tests DataSource and routing -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产 / test scope, not propagated to production
+            注：模块已从 realm-test-spring-boot-starter 重命名为 realm-test
+            Note: the module was renamed from realm-test-spring-boot-starter to realm-test
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

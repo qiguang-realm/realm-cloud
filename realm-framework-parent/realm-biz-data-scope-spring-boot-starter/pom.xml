@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-biz-data-scope-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：应用层数据范围（行级过滤）的解析与 SQL 织入
+        Responsibility boundary: application-level data scope (row-level filtering) resolution and SQL weaving
+        仅包含：DataScope 枚举、@DataScope 注解、MyBatis-Plus 拦截器、数据范围规则提供者 SPI
+        Only contains: DataScope enum, @DataScope annotation, MyBatis-Plus interceptor, data-scope rule provider SPI
+        不包含：权限规则定义（哪个角色对应哪个 Scope）、认证、Web 层逻辑
+        Does not contain: permission rule definitions (which role maps to which scope), authentication, or web-layer logic
+        数据范围规则由授权模块（realm-authorization）或应用提供，本模块只消费
+        Data-scope rules come from the authorization module (realm-authorization) or the application;
+        this module only consumes them
+    -->
+    <description>
+        应用层数据范围（行级过滤）：解析当前用户上下文，将 DataScope 条件织入 MyBatis-Plus 查询。
+        不定义数据范围规则，不处理认证，不依赖 Web 层。
+        Application-level data scope (row-level filtering): resolves the current user context
+        and weaves DataScope conditions into MyBatis-Plus queries.
+        No data-scope rule definitions, no authentication, no web-layer dependency.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、SubjectContext 接口、通用枚举；
+            数据范围 fail-close 时抛出 BusinessException（携带错误码），
+            由 realm-web 的 GlobalExceptionHandler 统一转换为 ProblemDetail 或 ApiResponse，
+            本模块不处理 HTTP 响应
+            Provides BusinessException, SubjectContext interface, common enums; data-scope fail-close
+            throws BusinessException (with an error code), which realm-web's GlobalExceptionHandler
+            converts uniformly to ProblemDetail or ApiResponse; this module does not handle HTTP responses
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合、日期等工具；SQL 条件拼接与数据范围规则转换需要
+            Provides string, collection, date utilities; needed for SQL condition building
+            and data-scope rule conversion
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            MyBatis-Plus 适配：realm-mybatis-plus-spring-boot-starter
+            MyBatis-Plus adapter: realm-mybatis-plus-spring-boot-starter
+            提供 SqlSessionFactory、MybatisPlusInterceptor 链；
+            并传递提供 mybatis-plus-extension（InnerInterceptor、MybatisPlusInterceptor 等 SPI），
+            本模块的拦截器直接实现这些 SPI 并追加到链上
+            Provides SqlSessionFactory and MybatisPlusInterceptor chain; transitively brings
+            mybatis-plus-extension (InnerInterceptor, MybatisPlusInterceptor and other SPIs),
+            which this module's interceptor implements directly and appends to the chain
+            compile：本模块的拦截器必须运行在 MyBatis-Plus 环境之上，不可 optional
+            compile: this module's interceptor must run on the MyBatis-Plus environment;
+            cannot be optional
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-mybatis-plus-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            SQL 解析：mybatis-plus-jsqlparser / SQL parsing: mybatis-plus-jsqlparser
+            MyBatis-Plus 3.5.9+ 已将 JSqlParser 解耦为独立依赖；
+            数据范围拦截器依赖它解析和改写 SQL
+            MyBatis-Plus 3.5.9+ has decoupled JSqlParser; the data-scope interceptor relies
+            on it to parse and rewrite SQL
+            不写 version：由父 POM 的 mybatis-plus.version 统一管理
+            No version: managed by parent POM's mybatis-plus.version
+        -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+        </dependency>
+
+        <!--
+            SpEL 表达式：spring-expression / SpEL: spring-expression
+            @DataScope 注解支持 SpEL 动态解析数据范围表达式
+            （如按当前用户部门构造 SQL 条件）
+            @DataScope supports SpEL to dynamically resolve data-scope expressions
+            (e.g. building SQL conditions from the current user's dept)
+            compile：注解解析与运行时求值是本模块的核心能力
+            compile: annotation parsing and runtime evaluation are core capabilities
+            of this module
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-expression</artifactId>
+        </dependency>
+
+        <!--
+            自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Auto-configuration foundation: @AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            提供条件装配与配置属性绑定；本模块的拦截器注册与 SPI 装配依赖它
+            Provides conditional assembly and configuration property binding;
+            this module's interceptor registration and SPI assembly depend on it
+            compile：自动配置类直接使用 / compile: auto-configuration classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            自动配置元数据生成器（optional）：生成 spring-autoconfigure-metadata.properties
+            Autoconfigure metadata processor (optional): generates
+            spring-autoconfigure-metadata.properties
+            启动时提前过滤不匹配的自动配置，降低启动开销
+            Pre-filters non-matching auto-configurations at startup to reduce boot cost
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；
+            用于验证拦截器 SQL 改写、SPI 装配、条件装配
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito;
+            used to verify interceptor SQL rewriting, SPI assembly, and conditional assembly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产 / test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

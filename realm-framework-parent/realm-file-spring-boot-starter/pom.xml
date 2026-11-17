@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-file-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：文件数据交换的抽象层
+        Responsibility boundary: file data exchange abstraction layer
+        仅包含：注解驱动的文件模型、流式处理的默认配置、导入校验骨架、
+                异步任务骨架、可替换的引擎 SPI、分片上传、安全压缩/解压、
+                文件预览与元数据、PDF 生成
+        Only contains: annotation-driven file model, streaming defaults, import
+                validation skeleton, async task skeleton, replaceable engine SPI,
+                chunked upload, secure zip, file preview & metadata, PDF generation
+        不包含：业务数据来源与查询方式、强制绑定单一引擎、文件存储（realm-object-storage）、
+                网络下载（出站 HTTP 客户端）、HTTP 响应写出（realm-web 的 TemplateDownloadUtils）
+        Does not contain: business data sources & query logic, forced single-engine binding,
+                file storage (realm-object-storage), network download (outbound HTTP client),
+                HTTP response writing (realm-web's TemplateDownloadUtils)
+        默认引擎为 FastExcel（Apache Fesod），POI 作为可选引擎用于公式、复杂样式、.xls 兼容；
+        PDFBox 与 Univocity 为 optional，只有显式引入才激活对应能力
+        Default engine is FastExcel (Apache Fesod); POI is an optional engine for formulas,
+        complex styles, and .xls compatibility; PDFBox and Univocity are optional and only
+        activated when explicitly pulled in
+        依据：OWASP 文件上传安全指南（不信任客户端提供的内容）；流式处理默认值消除 OOM 风险
+        Basis: OWASP file upload security guidance (never trust client-provided content);
+        streaming defaults eliminate OOM risk
+    -->
+    <description>
+        文件数据交换抽象层：注解驱动的文件模型、流式处理默认值、导入校验骨架、异步任务骨架、
+        可替换引擎 SPI、分片上传、安全压缩/解压、文件预览、PDF 生成。
+        默认 FastExcel（Apache Fesod），POI / PDFBox / Univocity 可选。
+        不包含业务数据来源、文件存储、网络下载、HTTP 响应写出。
+        File data exchange abstraction: annotation-driven file model, streaming defaults,
+        import validation skeleton, async task skeleton, replaceable engine SPI, chunked
+        upload, secure zip, file preview, PDF generation.
+        FastExcel (Apache Fesod) by default; POI / PDFBox / Univocity optional.
+        No business data sources, file storage, network download, or HTTP response writing.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException、通用枚举、FileMetadata / FilePreview / FileVersion 等 DTO；
+            文件解析失败、校验失败时抛出 BusinessException（携带错误码），
+            由 realm-web 的 GlobalExceptionHandler 统一转换，本模块不处理 HTTP 响应
+            Provides BusinessException, common enums, FileMetadata / FilePreview /
+            FileVersion DTOs; file parse and validation failures throw BusinessException
+            (with an error code), which realm-web's GlobalExceptionHandler converts;
+            this module does not handle HTTP responses
+            compile：契约在编译期与运行期都需要
+            compile: contracts are needed at compile and runtime
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合、JSON 辅助、文件 IO 工具（FileConvertUtil、FileMetadataUtil、
+            FileOperateUtil）；文件类型识别、错误信息组装、元数据读取需要
+            Provides string, collection, JSON helpers and file IO utilities
+            (FileConvertUtil, FileMetadataUtil, FileOperateUtil); needed for file type
+            detection, error message assembly, and metadata reading
+            compile：工具方法在编译期与运行期都需要
+            compile: utilities are needed at compile and runtime
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Auto-configuration foundation
+            本模块的自动配置类与配置属性类直接依赖
+            This module's auto-configuration and configuration-property classes depend on it directly
+            compile：自动配置类直接使用
+            compile: auto-configuration classes use it directly
+            注意：不引入 spring-boot-starter，避免拖入 Logback、snakeyaml 等文件处理库不需要的传递依赖
+            Note: does not bring in spring-boot-starter, avoiding transitive dependencies
+            (Logback, snakeyaml, etc.) that a file-processing library does not need
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            Spring 上下文：@Async / @Service / @Component / @Transactional
+            Spring context: @Async / @Service / @Component / @Transactional
+            异步任务骨架（@Async / ThreadPoolTaskExecutor）与业务类注册直接使用
+            The async task skeleton (@Async / ThreadPoolTaskExecutor) and business
+            class registration use it directly
+            compile：直接使用；spring-boot-autoconfigure 会传递引入 spring-context，
+            但按“直接使用即直接声明”原则显式声明
+            compile: used directly; spring-boot-autoconfigure transitively brings
+            spring-context, but declared explicitly per "use directly, declare directly"
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+
+        <!--
+            本地缓存构建：Guava
+            Local cache building: Guava
+            PdfUtils 使用 CacheBuilder 缓存字体字节数据（LRU + 24 小时过期），
+            防止多个大字体文件导致 OOM（CWE-770）
+            PdfUtils uses CacheBuilder to cache font byte data (LRU + 24h expiry),
+            preventing OOM (CWE-770) from multiple large font files
+            compile：PdfUtils 直接使用，属于本模块的运行时能力
+            compile: used directly by PdfUtils, a runtime capability of this module
+            Note: realm-utils transitively brings Guava, but declared explicitly per
+            "use directly, declare directly"
+        -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+        </dependency>
+
+        <!--
+            日志门面：SLF4J API
+            Logging facade: SLF4J API
+            FileChunkUtil、FilePreviewUtil、FileReaderUtil、PdfUtils 等直接使用 Logger
+            FileChunkUtil, FilePreviewUtil, FileReaderUtil, PdfUtils, etc. use Logger directly
+            compile：直接使用；realm-utils 传递引入 slf4j-api，但按“直接使用即直接声明”原则显式声明
+            compile: used directly; realm-utils transitively brings slf4j-api, but declared
+            explicitly per "use directly, declare directly"
+        -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <!--
+            Servlet API（provided）：PdfUtils.writePdfResponse 编译期需要 HttpServletResponse
+            Servlet API (provided): PdfUtils.writePdfResponse needs HttpServletResponse
+            at compile time
+            provided：由 Web 容器提供，不传递到下游；纯后台的文件处理不依赖本模块的
+            Web 相关方法时，不需要 Servlet API
+            provided: supplied by the web container, not propagated; pure background
+            file processing that does not use the Web-related methods of this module
+            does not need Servlet API
+            Note: 若后续将 writePdfResponse 拆分到 realm-web 的 web.file 包
+            （与 TemplateDownloadUtils 同包），本依赖可以移除
+            Note: if writePdfResponse is later moved to realm-web's web.file package
+            (alongside TemplateDownloadUtils), this dependency can be removed
+        -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            默认流式引擎：Apache Fesod（FastExcel 的 Apache 继任者，孵化中）
+            Default streaming engine: Apache Fesod (Apache successor of FastExcel, incubating)
+            提供流式读写、注解式映射、低内存大数据量处理；是本模块的默认引擎
+            Provides streaming read/write, annotation-based mapping, low-memory
+            large-dataset handling; the default engine of this module
+            compile：默认引擎必须随 starter 传递，业务方无需手动引入
+            compile: the default engine must ship with the starter; consumers don't
+            pull it in manually
+            版本由父 POM 的 dependencyManagement 管理（fesod.version）
+            Version managed by parent POM's dependencyManagement
+        -->
+        <dependency>
+            <groupId>org.apache.fesod</groupId>
+            <artifactId>fesod-sheet</artifactId>
+        </dependency>
+
+        <!--
+            可选引擎：Apache POI（optional） / Optional engine: Apache POI (optional)
+            用于公式、图表、复杂样式、数据透视表、.xls 兼容等 FastExcel 不覆盖的场景
+            Used for formulas, charts, complex styles, pivot tables, and .xls compatibility
+            that FastExcel does not cover
+            optional：只有显式启用 POI 引擎时才需要；相关配置类通过 @ConditionalOnClass 条件化
+            optional: needed only when the POI engine is explicitly enabled;
+            related configs gated by @ConditionalOnClass
+        -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            CSV/TSV 解析（optional）：Univocity / CSV/TSV parsing (optional): Univocity
+            用于 CSV/TSV 格式的导入导出；FastExcel 与 POI 都不覆盖纯文本分隔符格式
+            Used for CSV/TSV import/export; neither FastExcel nor POI covers
+            plain-text delimited formats
+            optional：按需引入，相关配置类通过 @ConditionalOnClass 条件化
+            optional: pulled in on demand; related configs gated by @ConditionalOnClass
+        -->
+        <dependency>
+            <groupId>com.univocity</groupId>
+            <artifactId>univocity-parsers</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            PDF 生成（optional）：Apache PDFBox / PDF generation (optional): Apache PDFBox
+            用于简单表格数据的 PDF 生成与渲染；复杂排版不在本模块职责内
+            Used for simple tabular-data PDF generation and rendering; complex layout
+            is out of this module's scope
+            optional：按需引入，PdfUtils 依赖本引擎，调用方必须显式引入 pdfbox
+            optional: pulled in on demand; PdfUtils depends on it, callers must
+            explicitly pull in pdfbox
+            Note: PdfUtils 为静态工具类，无条件引用 PDFBox；下游未引入 pdfbox 时，
+            调用 PdfUtils 的任何方法都会在类加载时抛 NoClassDefFoundError。
+            后续应将 PdfUtils 封装为 @ConditionalOnClass(PDDocument.class) 的自动配置 Bean，
+            由 Spring 容器提供，而不是让调用方直接调用静态方法
+            Note: PdfUtils is a static utility class that unconditionally references
+            PDFBox; if downstream does not pull in pdfbox, any call to PdfUtils will
+            throw NoClassDefFoundError at class loading. In the future, wrap PdfUtils
+            as an @ConditionalOnClass(PDDocument.class) auto-configuration bean,
+            provided by the Spring container, instead of letting callers invoke
+            static methods directly
+        -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            自动配置元数据生成器（optional）：生成 spring-autoconfigure-metadata.properties
+            Autoconfigure metadata processor (optional)
+            启动时提前过滤不匹配的自动配置，降低启动开销
+            Pre-filters non-matching auto-configurations at startup to reduce boot cost
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；
+            用于验证引擎选择、流式读写、校验骨架
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito;
+            used to verify engine selection, streaming read/write, and validation skeleton
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产 / test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM 模型版本（必需） / POM model version (required) -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父 POM 继承（版本 ${revision} 由父 POM 统一管理） / Parent POM (version ${revision} managed by parent) -->
+    <parent>
+        <groupId>cn.realm.cloud</groupId>
+        <artifactId>realm-framework-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <!-- 项目标识（groupId 与 version 继承自父 POM，此处仅需指定 artifactId） / Project coordinates (inherits groupId & version) -->
+    <artifactId>realm-mybatis-plus-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>${project.artifactId}</name>
+
+    <!--
+        职责边界：MyBatis-Plus 适配层（ORM 适配器）
+        Responsibility boundary: MyBatis-Plus adapter (ORM adapter)
+        建立在 realm-data-access-spring-boot-starter 之上，负责 SqlSessionFactory、
+        拦截器链、Mapper 扫描、分页插件
+        Built on realm-data-access-spring-boot-starter; responsible for SqlSessionFactory,
+        interceptor chain, Mapper scanning, pagination plugin
+        与 realm-data-jpa-spring-boot-starter 平行：应用二选一，或按需共存
+        Parallel to realm-data-jpa-spring-boot-starter: apps pick one, or coexist when needed
+        不包含：连接池、多数据源路由、事务基础设施（由 realm-data-access-spring-boot-starter 提供）
+        Does not contain: connection pool, multi-datasource routing, transaction infrastructure
+        (provided by realm-data-access-spring-boot-starter)
+    -->
+    <description>
+        MyBatis-Plus 适配层：SqlSessionFactory、拦截器链、Mapper 扫描、分页插件。
+        建立在 realm-data-access-spring-boot-starter 之上，与 realm-data-jpa-spring-boot-starter 平行。
+        不包含连接池、多数据源路由、事务基础设施。
+        MyBatis-Plus adapter: SqlSessionFactory, interceptor chain, Mapper scanning, pagination plugin.
+        Built on realm-data-access-spring-boot-starter; parallel to realm-data-jpa-spring-boot-starter.
+        No connection pool, multi-datasource routing, or transaction infrastructure.
+    </description>
+
+    <!-- 项目地址 / Project URL -->
+    <url>https://github.com/qiguang-realm/java-realm</url>
+
+    <!-- 依赖配置（所有版本由父 POM 的 dependencyManagement 统一管控） / Dependencies (all versions managed by parent) -->
+    <dependencies>
+
+        <!--
+            数据访问基础设施：realm-data-access-spring-boot-starter
+            Data access foundation: realm-data-access-spring-boot-starter
+            提供 DataSource、连接池、多数据源路由、事务基础设施；
+            MyBatis-Plus 的 SqlSessionFactory 依赖 DataSource
+            Provides DataSource, connection pool, multi-datasource routing,
+            transaction infrastructure; MyBatis-Plus SqlSessionFactory depends on DataSource
+            compile：本模块的运行必须建立在其之上
+            compile: this module's runtime must build on it
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-data-access-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            技术契约：realm-core / Technical contracts: realm-core
+            提供 BusinessException；MyBatis-Plus 的 PersistenceException 等由本模块
+            转换为 BusinessException（携带错误码），再由 realm-web 的
+            GlobalExceptionHandler 统一转换为 ProblemDetail 或 ApiResponse，
+            本模块不处理 HTTP 响应
+            Provides BusinessException; MyBatis-Plus's PersistenceException etc. are
+            converted by this module to BusinessException (with an error code), which
+            realm-web's GlobalExceptionHandler then converts to ProblemDetail or ApiResponse;
+            this module does not handle HTTP responses
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-core</artifactId>
+        </dependency>
+
+        <!--
+            通用工具类：realm-utils / General utilities: realm-utils
+            提供字符串、集合等工具；SQL 条件构建、Mapper 命名等需要
+            Provides string, collection utilities; needed for SQL condition building
+            and Mapper naming
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-utils</artifactId>
+        </dependency>
+
+        <!--
+            自动配置基础：@AutoConfiguration / @ConditionalOnClass / @ConfigurationProperties
+            Auto-configuration foundation
+            本模块包含自动配置类与配置属性类，必须显式声明；
+            与 realm-data-access、realm-data-jpa、realm-data-redis、
+            realm-distributed-transaction、realm-feature-env、realm-file、
+            realm-messaging、realm-multitenancy 等模块风格一致
+            This module contains auto-configuration and configuration-property classes;
+            declared explicitly for consistency with realm-data-access, realm-data-jpa,
+            realm-data-redis, realm-distributed-transaction, realm-feature-env, realm-file,
+            realm-messaging, and realm-multitenancy
+            compile：自动配置类直接使用
+            compile: auto-configuration classes use it directly
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!--
+            MyBatis-Plus Spring Boot 3 Starter：核心 ORM 适配依赖
+            MyBatis-Plus Spring Boot 3 starter: core ORM adapter dependency
+            提供 MybatisPlusAutoConfiguration、SqlSessionFactory、Mapper 扫描、
+            MyBatis-Plus 核心 API
+            Provides MybatisPlusAutoConfiguration, SqlSessionFactory, Mapper scanning,
+            MyBatis-Plus core API
+            compile：本模块的核心运行时依赖
+            compile: core runtime dependency of this module
+        -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+        </dependency>
+
+        <!--
+            JSqlParser 独立依赖（分页必需）
+            JSqlParser standalone dependency (required for pagination)
+            MyBatis-Plus 3.5.9 起 PaginationInnerInterceptor 已从核心拆分；
+            不引入本依赖，分页将静默失效
+            PaginationInnerInterceptor decoupled from core since MyBatis-Plus 3.5.9;
+            pagination silently fails without this dependency
+            compile：分页是本模块的基础能力
+            compile: pagination is a foundational capability of this module
+        -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+        </dependency>
+
+        <!--
+            联表查询扩展：mybatis-plus-join（compile）
+            Join query extension: mybatis-plus-join (compile)
+            提供 MPJLambdaWrapper、MPJQueryWrapper 等联表查询能力
+            Provides MPJLambdaWrapper, MPJQueryWrapper etc.
+            compile：本模块的 BaseMapperX 直接 extends MPJBaseMapper，
+            方法签名中使用 MPJLambdaWrapper / MPJBaseJoin；如果改为 optional，
+            不使用 join 的应用在加载 BaseMapperX 时会抛 NoClassDefFoundError
+            （父接口不存在），这不是方法调用时才失败，而是接口加载时就失败
+            compile: this module's BaseMapperX directly extends MPJBaseMapper and uses
+            MPJLambdaWrapper / MPJBaseJoin in method signatures; if changed to optional,
+            apps not pulling in join would throw NoClassDefFoundError when loading
+            BaseMapperX (parent interface missing) — this is a class-loading failure,
+            not a method-call-time failure
+            版本由父 POM 的 mybatis-plus-join.version 统一管理
+            Version managed by parent POM's mybatis-plus-join.version
+        -->
+        <dependency>
+            <groupId>com.github.yulichang</groupId>
+            <artifactId>mybatis-plus-join-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+            自动配置元数据生成器（optional）：生成 spring-autoconfigure-metadata.properties
+            Autoconfigure metadata processor (optional)
+            启动时提前过滤不匹配的自动配置，降低启动开销
+            Pre-filters non-matching auto-configurations at startup to reduce boot cost
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            配置元数据生成器（optional） / Spring Boot configuration metadata processor (optional)
+            编译期生成 IDE 配置提示，运行时不需
+            Generates IDE configuration hints at compile time; not needed at runtime
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            编译期工具：Lombok / Compile-time tooling: Lombok
+            optional：纯编译期注解处理器，运行时不需要，不传递
+            optional: pure compile-time annotation processor; not needed at runtime,
+            not propagated
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            测试相关 / Testing
+            spring-boot-starter-test 提供 JUnit 5、AssertJ、Mockito；
+            H2 用于验证 SqlSessionFactory 与 Mapper 扫描
+            spring-boot-starter-test brings JUnit 5, AssertJ, Mockito;
+            H2 validates SqlSessionFactory and Mapper scanning
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- H2 内存数据库：测试 MyBatis-Plus 配置与 Mapper 扫描 / H2 in-memory DB: tests MyBatis-Plus configuration and Mapper scanning -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            测试支撑（test）：realm 项目的测试基类与 Mock 环境
+            Test support (test): realm's test base classes and mock environment
+            test 作用域，不传递到生产 / test scope, not propagated to production
+        -->
+        <dependency>
+            <groupId>cn.realm.cloud</groupId>
+            <artifactId>realm-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>
