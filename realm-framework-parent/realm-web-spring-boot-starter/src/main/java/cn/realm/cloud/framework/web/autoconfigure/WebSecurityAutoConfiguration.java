@@ -1,6 +1,7 @@
 package cn.realm.cloud.framework.web.autoconfigure;
 
 import cn.realm.cloud.framework.web.properties.WebSecurityProperties;
+import cn.realm.cloud.framework.web.security.ClientIpResolver;
 import cn.realm.cloud.framework.web.security.SecurityHeadersFilter;
 import cn.realm.cloud.framework.web.security.WebCorsConfigurer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -11,6 +12,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+
+import java.util.Set;
 
 /**
  * Web 安全基线自动配置。
@@ -60,5 +63,19 @@ public class WebSecurityAutoConfiguration {
     @ConditionalOnMissingBean
     public WebCorsConfigurer webCorsConfigurer(WebSecurityProperties properties) {
         return new WebCorsConfigurer(properties);
+    }
+
+    /**
+     * 客户端IP安全解析器。
+     * <p>遵循 OWASP ASVS 防IP伪造规则：仅当直连地址属于可信代理时，才解析转发头。
+     *
+     * @param properties web安全配置，读取 trustedProxies 可信代理列表
+     * @return ClientIpResolver 单例Bean
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public ClientIpResolver clientIpResolver(WebSecurityProperties properties) {
+        Set<String> trustedProxies = properties.getTrustedProxies();
+        return new ClientIpResolver(trustedProxies);
     }
 }

@@ -4,7 +4,6 @@
  * <p><b>模块职责：</b>
  * 负责内部员工身份与访问管理（Workforce IAM）的业务实现，包括用户、部门、角色、菜单、OAuth 客户端与令牌。
  * 对外暴露的契约（Facade 接口、DTO、领域事件）定义在 {@code realm-workforce-identity-api} 模块中，
- * 本模块通过 {@link cn.realm.cloud.workforce.identity.IdentityFacadeImpl} 来实现这些契约。
  *
  * <p><b>包结构约束（严格隔离）：</b>
  * <ul>
@@ -13,12 +12,19 @@
  *         {@code internal} 子包下，由 Spring Modulith 在编译期和运行期强制隐藏，禁止被其他业务模块直接引用。</li>
  * </ul>
  *
+ * <p><b>接入层契约（REST 入口，遵循 Google AIP / OpenAPI3 规范）：</b>
+ * <ul>
+ *     <li>{@code internal.adapter.inbound.web.admin}：B端管理后台接口，路由前缀 {@code /identity/admin}</li>
+ *     <li>{@code internal.adapter.inbound.web.app}：C端App/小程序接口，路由前缀 {@code /identity/app}</li>
+ *     <li>{@code internal.adapter.inbound.web.external}：开放平台第三方接口，路由前缀 {@code /identity/external}</li>
+ *     <li>{@code internal.adapter.inbound.internal}：微服务模块间内部调用接口，路由前缀 {@code /identity/internal}，禁止公网网关暴露</li>
+ * </ul>
+ *
  * <p><b>Module Responsibilities:</b>
  * Responsible for the business implementation of Workforce Identity and Access Management,
  * including users, departments, roles, menus, OAuth clients, and tokens.
  * The public contracts (Facade interfaces, DTOs, domain events) are defined in the
  * {@code realm-workforce-identity-api} module, and this module implements them via
- * {@link cn.realm.cloud.workforce.identity.IdentityFacadeImpl}.
  *
  * <p><b>Package Structure Constraints:</b>
  * Only {@code IdentityFacadeImpl} is kept in the root package. All specific business logic

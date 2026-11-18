@@ -1,34 +1,50 @@
 # ============================================================
-# 注册中心 + 配置中心（Nacos）
+# Nacos 注册&配置中心 | Spring Boot Admin Client | Actuator
+# 规范来源：Spring Cloud Security、OWASP、CNCF Observability Best Practice
 # ============================================================
-
 spring:
-  # ---- 注册中心 + 配置中心 ----
   cloud:
     nacos:
-      server-addr: 127.0.0.1:8848
-      username:
-      password:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      # 凭证外部化：从环境变量注入，禁止YAML明文提交代码仓库
+      username: ${NACOS_USERNAME:}
+      password: ${NACOS_PASSWORD:}
       discovery:
-        namespace: dev
-        group: DEFAULT_GROUP
+        namespace: ${NACOS_NAMESPACE:dev}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        metadata:
+          service-domain: identity
+          service-version: 1.0.0
       config:
-        namespace: dev
-        group: DEFAULT_GROUP
+        namespace: ${NACOS_NAMESPACE:dev}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        file-extension: yml
 
-  # ---- Spring Boot Admin ----
   boot:
     admin:
       client:
         instance:
-          service-host-type: IP # 可选：IP / HOST_NAME / CANONICAL_HOST_NAME
-        username: admin
-        password: admin
+          service-host-type: IP
+        # SBA账号环境变量注入，禁止硬编码
+        username: ${SBA_CLIENT_USERNAME:}
+        password: ${SBA_CLIENT_PASSWORD:}
 
-# ===== 监控 =====
+# ===== Actuator / 可观测性（最小权限原则，国际标准） =====
 management:
   endpoints:
     web:
-      base-path: /actuator # 默认 /actuator
+      base-path: /actuator
       exposure:
-        include: '*' # 开放所有端点，默认仅 health / info
+        include: health, info, metrics, prometheus
+        exclude: env, beans, shutdown, heapdump, threaddump, configprops
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  # 👇 prometheus 配置迁移到这里
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+

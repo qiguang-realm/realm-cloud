@@ -1,7 +1,7 @@
 package cn.realm.cloud.workforce.identity.internal.organization.application;
 
 import cn.realm.cloud.workforce.identity.internal.organization.infrastructure.persistence.DepartmentDO;
-import cn.realm.cloud.workforce.identity.internal.organization.api.web.admin.dto.DepartmentResponse;
+import cn.realm.cloud.workforce.identity.internal.organization.adapter.inbound.web.admin.dto.DepartmentResponse;
 
 import java.util.List;
 import java.util.Optional;

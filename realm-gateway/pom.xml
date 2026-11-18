@@ -144,6 +144,17 @@
         </dependency>
 
         <!--
+            Caffeine 缓存：Spring Cloud LoadBalancer 负载均衡实例缓存
+            Caffeine cache: instance cache for Spring Cloud LoadBalancer
+            替换默认简易缓存，消除生产环境警告，提升负载均衡缓存性能
+            Replaces the default simple cache, suppresses production warning and improves cache performance
+        -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
+        <!--
             服务发现：Nacos Discovery
             Service discovery: Nacos Discovery
             网关需要从注册中心获取后端服务实例列表

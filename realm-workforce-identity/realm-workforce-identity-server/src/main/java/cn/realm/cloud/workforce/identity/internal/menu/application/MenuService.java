@@ -1,6 +1,6 @@
 package cn.realm.cloud.workforce.identity.internal.menu.application;
 
-import cn.realm.cloud.workforce.identity.internal.menu.api.web.admin.dto.MenuResponse;
+import cn.realm.cloud.workforce.identity.internal.menu.adapter.inbound.web.admin.dto.MenuResponse;
 import cn.realm.cloud.workforce.identity.internal.menu.infrastructure.persistence.MenuDO;
 
 import java.util.List;

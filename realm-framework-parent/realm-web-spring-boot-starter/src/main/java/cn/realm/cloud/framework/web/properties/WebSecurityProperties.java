@@ -3,7 +3,9 @@ package cn.realm.cloud.framework.web.properties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Web 安全基线配置（前缀 {@code realm.web.security}）。
@@ -18,6 +20,12 @@ public class WebSecurityProperties {
      */
     private boolean enabled = true;
 
+    /**
+     * 可信代理列表，支持IP，后续可扩展CIDR；
+     * 只有直连IP命中此列表，才信任 X-Forwarded-For / X-Real-IP 转发头，防止IP伪造。
+     */
+    private Set<String> trustedProxies = new HashSet<>();
+
     private Headers headers = new Headers();
     private Cors cors = new Cors();
 
@@ -27,6 +35,14 @@ public class WebSecurityProperties {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public Set<String> getTrustedProxies() {
+        return trustedProxies;
+    }
+
+    public void setTrustedProxies(Set<String> trustedProxies) {
+        this.trustedProxies = trustedProxies;
     }
 
     public Headers getHeaders() {

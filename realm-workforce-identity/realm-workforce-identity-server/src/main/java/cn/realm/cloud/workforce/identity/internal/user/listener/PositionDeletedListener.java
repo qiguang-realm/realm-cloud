@@ -4,8 +4,11 @@ import cn.realm.cloud.workforce.identity.internal.organization.events.PositionDe
 import cn.realm.cloud.workforce.identity.internal.user.domain.repository.UserPositionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.modulith.ApplicationModuleListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * 岗位删除事件的监听器。
@@ -33,7 +36,9 @@ public class PositionDeletedListener {
 
     private final UserPositionRepository userPositionRepository;
 
-    @ApplicationModuleListener
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    @TransactionalEventListener
     public void on(PositionDeletedEvent event) {
         if (event == null || event.id() == null) {
             return;

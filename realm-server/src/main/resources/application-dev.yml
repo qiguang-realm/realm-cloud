@@ -54,12 +54,18 @@ spring:
 
       datasource:
         master:
+          # ---- 本地开发（推荐）----
           url: jdbc:mysql://127.0.0.1:3306/realm?useUnicode=true&characterEncoding=utf8&sslMode=DISABLED&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          # ---- 生产环境（推荐）----
+          # url: jdbc:mysql://prod-host:3306/realm?useUnicode=true&characterEncoding=utf8&sslMode=REQUIRED&serverTimezone=Asia/Shanghai&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
           username: root
           password: root
         slave:
           lazy: true # 懒加载，加快启动
+          # ---- 本地开发（推荐）----
           url: jdbc:mysql://127.0.0.1:3306/realm?useUnicode=true&characterEncoding=utf8&sslMode=DISABLED&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          # ---- 生产环境（推荐）----
+          # url: jdbc:mysql://prod-host:3306/realm?useUnicode=true&characterEncoding=utf8&sslMode=REQUIRED&serverTimezone=Asia/Shanghai&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
           username: root
           password: root
 

@@ -1,7 +1,7 @@
 package cn.realm.cloud.workforce.identity.internal.organization.application;
 
-import cn.realm.cloud.workforce.identity.internal.organization.api.web.admin.converter.DepartmentAdminConverter;
-import cn.realm.cloud.workforce.identity.internal.organization.api.web.admin.dto.DepartmentResponse;
+import cn.realm.cloud.workforce.identity.internal.organization.adapter.inbound.web.admin.converter.DepartmentAdminConverter;
+import cn.realm.cloud.workforce.identity.internal.organization.adapter.inbound.web.admin.dto.DepartmentResponse;
 import cn.realm.cloud.workforce.identity.internal.organization.domain.repository.DepartmentRepository;
 import cn.realm.cloud.workforce.identity.internal.organization.events.DepartmentDeletedEvent;
 import cn.realm.cloud.workforce.identity.internal.organization.events.DepartmentStatusChangedEvent;

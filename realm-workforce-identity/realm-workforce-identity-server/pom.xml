@@ -155,6 +155,22 @@
         </dependency>
 
         <!--
+            MySQL JDBC驱动 / MySQL JDBC Driver
+            runtime：编译期不需要，仅数据库连接运行时依赖；
+            本业务模块明确使用MySQL作为主存储，显式引入驱动；
+            realm-mybatis-plus-spring-boot-starter 内驱动全部为 optional，不传递，由业务模块按需声明
+            runtime: not required at compile time, required only for database connection at runtime;
+            this business module explicitly uses MySQL as primary storage;
+            drivers inside realm-mybatis-plus-spring-boot-starter are all optional and not transitive,
+            declared on demand by business module
+        -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!--
             Web 层：realm-web-spring-boot-starter / Web layer: realm-web-spring-boot-starter
             管理后台的 REST API（用户/角色/部门/菜单/OAuth 客户端的 CRUD）
             Admin backend REST APIs (CRUD for users, roles, departments, menus, OAuth clients)

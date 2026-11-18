@@ -3,8 +3,11 @@ package cn.realm.cloud.workforce.identity.internal.user.listener;
 import cn.realm.cloud.workforce.identity.internal.organization.events.PositionStatusChangedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.modulith.ApplicationModuleListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * 岗位状态变更事件的监听器。
@@ -28,7 +31,9 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class PositionStatusChangedListener {
 
-    @ApplicationModuleListener
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    @TransactionalEventListener
     public void on(PositionStatusChangedEvent event) {
         if (event == null || event.id() == null) {
             return;

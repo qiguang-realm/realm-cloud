@@ -1,8 +1,8 @@
 package cn.realm.cloud.workforce.identity.internal.menu.application;
 
 import cn.realm.cloud.workforce.identity.internal.menu.events.MenuDeletedEvent;
-import cn.realm.cloud.workforce.identity.internal.menu.api.web.admin.converter.MenuAdminConverter;
-import cn.realm.cloud.workforce.identity.internal.menu.api.web.admin.dto.MenuResponse;
+import cn.realm.cloud.workforce.identity.internal.menu.adapter.inbound.web.admin.converter.MenuAdminConverter;
+import cn.realm.cloud.workforce.identity.internal.menu.adapter.inbound.web.admin.dto.MenuResponse;
 import cn.realm.cloud.workforce.identity.internal.menu.infrastructure.persistence.MenuDO;
 import cn.realm.cloud.workforce.identity.internal.menu.domain.repository.MenuRepository;
 import cn.realm.cloud.workforce.identity.internal.menu.events.MenuStatusChangedEvent;
